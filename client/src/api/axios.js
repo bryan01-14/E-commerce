@@ -2,14 +2,10 @@
 import axios from 'axios';
 
 const api = axios.create({
+  timeout: 10000, // 10 secondes
   baseURL: "https://backend-beta-blond-93.vercel.app/api" || 'http://localhost:5000/api',
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
-} // Pour les cookies de session
-);
+  withCredentials: true, // Pour les cookies de session
+});
 
 // Intercepteur pour ajouter le token
 api.interceptors.request.use((config) => {

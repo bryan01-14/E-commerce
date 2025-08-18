@@ -53,11 +53,13 @@ app.use(helmet());
 
 // 3. Configuration du rate limiting APRÈS trust proxy
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 100,
-  keyGenerator: (req) => {
-    // Méthode fiable pour obtenir l'IP sur Vercel
-    return req.headers['x-real-ip'] || req.ip;
+  handler: (req, res) => { // Ajoutez ce handler
+    res.status(429).json({
+      error: "Trop de requêtes",
+      message: "Veuillez réessayer plus tard"
+    });
   }
 });
 app.use(limiter);
