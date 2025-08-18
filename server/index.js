@@ -24,7 +24,7 @@ app.set('trust proxy', true);
 // 2. Configuration Socket.IO
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: process.env.CLIENT_URL || "http://localhost:3000" || "https://frontend-nine-eta-99.vercel.app",
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -41,7 +41,7 @@ const corsOptions = {
     // Liste des origines autorisées en production
     const allowedOrigins = [
       process.env.FRONTEND_URL,
-      'https://votre-frontend.vercel.app',
+      'https://frontend-nine-eta-99.vercel.app',
       'http://localhost:3000'
     ];
     
