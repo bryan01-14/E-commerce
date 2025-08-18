@@ -8,6 +8,7 @@ const MongoStore = require('connect-mongo');
 const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
+const serverless = require('serverless-http');
 
 const authRoutes = require('./routes/auth');
 const orderRoutes = require('./routes/orders');
@@ -101,4 +102,7 @@ server.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
 });
 
-module.exports = { app, io };
+// Export unique et propre pour Vercel
+const handler = serverless(app);
+module.exports = handler; // Export principal pour Vercel
+module.exports.io = io;   // Export additionnel si nécessaire
