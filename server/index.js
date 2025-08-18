@@ -133,16 +133,34 @@ if (process.env.NODE_ENV !== 'production') {
   app.set('io', io);
 }
 
-// Configuration pour Vercel vs développement local
-if (process.env.VERCEL) {
-  // Mode production Vercel (Serverless)
-  const serverless = require('serverless-http');
-  module.exports = serverless(app);
-} else {
+// Remplacez la partie finale par :
+
+const PORT = process.env.PORT || 5000;
+
+if (require.main === module) {
   // Mode développement local
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => {
-    console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
-    console.log(`Origines CORS autorisées: ${allowedOrigins.join(', ')}`);
+  const server = app.listen(PORT, () => {
+    console.log(`Serveur Express sur http://localhost:${PORT}`);
   });
+  
+  // Configuration Socket.IO seulement en local
+  const io = require('socket.io')(server, {
+    cors: {
+      origin: allowedOrigins,
+      methods: ["GET", "POST"],
+      credentials: true
+    }
+  });
+  
+  io.on('connection', (socket) => {
+    console.log('Nouveau client connecté:', socket.id);
+    socket.on('disconnect', () => {
+      console.log('Client déconnecté:', socket.id);
+    });
+  });
+  
+  app.set('io', io);
+} else {
+  // Mode production Vercel
+  module.exports = app;
 }

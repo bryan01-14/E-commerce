@@ -1,10 +1,6 @@
-const { createServer } = require('http');
+// Fichier spécifique pour Vercel
 const app = require('../index');
+const serverless = require('serverless-http');
 
-module.exports = createServer((req, res) => {
-  // Ajoutez ce middleware pour éviter l'erreur "listener is not a function"
-  if (!req.url.startsWith('/api')) {
-    req.url = `/api${req.url}`;
-  }
-  return app(req, res);
-});
+// Exportez directement l'application sans créer de nouveau serveur
+module.exports = serverless(app);
