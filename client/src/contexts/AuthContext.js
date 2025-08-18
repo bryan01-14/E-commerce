@@ -48,8 +48,10 @@ export const AuthProvider = ({ children }) => {
   // Fonction de connexion
   const login = async (credentials) => {
     try {
+      console.time('Login');
       const response = await axios.post('https://backend-beta-blond-93.vercel.app/api/auth/login', credentials);
       const { user, token } = response.data;
+      console.timeEnd('Login');
       
       setUser(user);
       setToken(token);
