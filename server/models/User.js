@@ -98,9 +98,9 @@ userSchema.methods.toPublicJSON = function() {
 };
 
 // Index pour améliorer les performances
-userSchema.index({ username: 1 });
-userSchema.index({ email: 1 });
-userSchema.index({ role: 1 });
-userSchema.index({ boutique: 1 });
+// userSchema.index({ username: 1 });
+// userSchema.index({ email: 1 });
+// userSchema.index({ role: 1 });
+// userSchema.index({ boutique: 1 });
 
 module.exports = mongoose.model('User', userSchema);
