@@ -7,24 +7,25 @@
     }
   ],
   "routes": [
-        {
-      "src": "/(.*)",
+    {
+      "src": "/api/(.*)",
       "dest": "index.js",
       "headers": {
-        "Access-Control-Allow-Origin": "*"
+        "Access-Control-Allow-Origin": "https://frontend-nine-eta-99.vercel.app" ,
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-real-ip",
+        "Access-Control-Allow-Credentials": "true"
       }
+    },
+    {
+      "src": "/(.*)",
+      "dest": "index.js"
     }
   ],
-
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://votre-frontend.vercel.app" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, x-real-ip" },
-        { "key": "Access-Control-Allow-Credentials", "value": "true" }
-      ]
+  "functions": {
+    "index.js": {
+      "memory": 3008,
+      "maxDuration": 30
     }
-  ]
+  }
 }
