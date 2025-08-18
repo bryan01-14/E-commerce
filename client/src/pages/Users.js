@@ -39,7 +39,7 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('/api/users');
+      const response = await axios.get('https://backend-beta-blond-93.vercel.app/api/users');
       setUsers(response.data.users || []);
     } catch (error) {
       toast.error('Erreur lors du chargement des utilisateurs');

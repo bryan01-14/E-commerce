@@ -23,7 +23,7 @@ const Register = () => {
     setLoading(true);
     try {
       // Vérifier d'abord s'il existe déjà un admin principal
-      const checkResponse = await axios.get('/api/users/check-admin');
+      const checkResponse = await axios.get('https://backend-beta-blond-93.vercel.app/api/users/check-admin');
       
       if (checkResponse.data.hasAdmin) {
         toast.error('Un administrateur principal existe déjà. L\'inscription est fermée.');
@@ -31,7 +31,7 @@ const Register = () => {
       }
 
       // Créer le premier admin principal
-      const response = await axios.post('/api/auth/register', {
+      const response = await axios.post('https://backend-beta-blond-93.vercel.app/api/auth/register', {
         ...data,
         role: 'admin'
       });

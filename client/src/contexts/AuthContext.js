@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }) => {
   // Fonction de connexion
   const login = async (credentials) => {
     try {
-      const response = await axios.post('/api/auth/login', credentials);
+      const response = await axios.post('https://backend-beta-blond-93.vercel.app/api/auth/login', credentials);
       const { user, token } = response.data;
       
       setUser(user);
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }) => {
     delete axios.defaults.headers.common['Authorization'];
     
     // Appeler l'API de déconnexion
-    axios.post('/api/auth/logout').catch(console.error);
+    axios.post('https://backend-beta-blond-93.vercel.app/api/auth/logout').catch(console.error);
     
     toast.success('Déconnexion réussie');
   };
@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }) => {
   // Fonction de changement de mot de passe
   const changePassword = async (passwords) => {
     try {
-      await axios.post('/api/auth/change-password', passwords);
+      await axios.post('https://backend-beta-blond-93.vercel.app/api/auth/change-password', passwords);
       toast.success('Mot de passe modifié avec succès');
       return { success: true };
     } catch (error) {
@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }) => {
   // Fonction de mise à jour du profil
   const updateProfile = async (profileData) => {
     try {
-      const response = await axios.put(`/api/users/${user._id}`, profileData);
+      const response = await axios.put(`https://backend-beta-blond-93.vercel.app/api/users/${user._id}`, profileData);
       setUser(response.data.user);
       toast.success('Profil mis à jour avec succès');
       return { success: true };

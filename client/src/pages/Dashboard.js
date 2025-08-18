@@ -22,8 +22,8 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         const [statsResponse, ordersResponse] = await Promise.all([
-          axios.get('/api/orders/stats/overview'),
-          axios.get('/api/orders?limit=5&sortBy=dateCommande&sortOrder=desc')
+          axios.get('https://backend-beta-blond-93.vercel.app/api/orders/stats/overview'),
+          axios.get('https://backend-beta-blond-93.vercel.app/api/orders?limit=5&sortBy=dateCommande&sortOrder=desc')
         ]);
 
         setStats(statsResponse.data);

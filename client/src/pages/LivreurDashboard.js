@@ -33,7 +33,7 @@ const LivreurDashboard = () => {
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/orders/livreur/${user._id}`);
+      const response = await axios.get(`https://backend-beta-blond-93.vercel.app/api/orders/livreur/${user._id}`);
       const ordersData = response.data.orders || [];
       setOrders(ordersData);
       
@@ -56,7 +56,7 @@ const LivreurDashboard = () => {
   // Mettre à jour le statut d'une commande
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      await axios.put(`/api/orders/${orderId}/status`, {
+      await axios.put(`https://backend-beta-blond-93.vercel.app/api/orders/${orderId}/status`, {
         status: newStatus,
         livreurId: user._id
       });
