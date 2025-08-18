@@ -1,0 +1,41 @@
+{
+  "name": "commerce-order-management",
+  "version": "1.0.0",
+  "description": "Application de gestion des commandes e-commerce avec synchronisation Google Sheets",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install",
+    "start": "cd server && npm start",
+    "setup": "npm run install-all && echo \"Configuration terminée. N'oubliez pas de configurer le fichier .env dans le dossier server/\""
+  },
+  "keywords": [
+    "ecommerce",
+    "order-management",
+    "react",
+    "nodejs",
+    "mongodb",
+    "google-sheets",
+    "delivery-tracking"
+  ],
+  "author": "Votre Nom",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/votre-username/commerce-order-management.git"
+  },
+  "bugs": {
+    "url": "https://github.com/votre-username/commerce-order-management/issues"
+  },
+  "homepage": "https://github.com/votre-username/commerce-order-management#readme"
+}

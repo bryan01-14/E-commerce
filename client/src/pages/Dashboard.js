@@ -1,0 +1,330 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  Package,
+  Truck,
+  CheckCircle,
+  XCircle,
+  Clock,
+  SwissFranc
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+
+const Dashboard = () => {
+  const { user } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [statsResponse, ordersResponse] = await Promise.all([
+          axios.get('/api/orders/stats/overview'),
+          axios.get('/api/orders?limit=5&sortBy=dateCommande&sortOrder=desc')
+        ]);
+
+        setStats(statsResponse.data);
+        setRecentOrders(ordersResponse.data.orders || []);
+      } catch (error) {
+        console.error('Erreur lors du chargement du dashboard:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'Livré':
+        return <CheckCircle className="h-5 w-5 text-success-500" />;
+      case 'Non Livré':
+        return <XCircle className="h-5 w-5 text-danger-500" />;
+      case 'Attribué':
+        return <Truck className="h-5 w-5 text-primary-500" />;
+      default:
+        return <Clock className="h-5 w-5 text-warning-500" />;
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'Livré':
+        return 'badge-success';
+      case 'Non Livré':
+        return 'badge-danger';
+      case 'Attribué':
+        return 'badge-info';
+      case 'Reprogrammé':
+        return 'badge-warning';
+      default:
+        return 'badge-info';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Tableau de bord
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Bienvenue, {user?.prenom} {user?.nom}
+        </p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="card">
+          <div className="card-body">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Package className="h-8 w-8 text-primary-600" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Total Commandes
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900">
+                    {stats?.total || 0}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <CheckCircle className="h-8 w-8 text-success-600" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Livrées
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900">
+                    {stats?.statsByStatus?.find(s => s._id === 'Livré')?.count || 0}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Clock className="h-8 w-8 text-warning-600" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    En attente
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900">
+                    {stats?.statsByStatus?.find(s => s._id === 'En attente')?.count || 0}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <SwissFranc className="h-8 w-8 text-success-600" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 truncate">
+                    Chiffre d'affaires
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900">
+                    {stats?.totalValue?.toLocaleString('fr-FR', {
+                      style: 'currency',
+                      currency: 'XOF'
+                    }) || '0 FCFA'}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Orders */}
+      <div className="card">
+        <div className="card-header">
+          <h3 className="text-lg leading-6 font-medium text-gray-900">
+            Commandes récentes
+          </h3>
+        </div>
+        <div className="card-body">
+          {recentOrders.length === 0 ? (
+            <p className="text-gray-500 text-center py-8">
+              Aucune commande récente
+            </p>
+          ) : (
+            <div className="overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Commande
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Client
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Produit
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Statut
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Prix
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {Array.isArray(recentOrders) && recentOrders.map((order) => (
+                    <tr key={order._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {order.numeroCommande}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div>
+                          <div className="font-medium">{order.nomClient}</div>
+                          <div className="text-gray-500">{order.telephone}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div>
+                          <div className="font-medium">{order.produit}</div>
+                          <div className="text-gray-500">Qté: {order.quantite}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {getStatusIcon(order.statut)}
+                          <span className={`ml-2 ${getStatusBadge(order.statut)}`}>
+                            {order.statut}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {format(new Date(order.dateCommande), 'dd/MM/yyyy HH:mm', { locale: fr })}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {order.prix.toLocaleString('fr-FR', {
+                          style: 'currency',
+                          currency: 'EUR'
+                        })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="card">
+          <div className="card-body">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Actions rapides
+            </h3>
+            <div className="space-y-3">
+              <button className="w-full btn-primary">
+                Voir toutes les commandes
+              </button>
+              {user?.role === 'admin' && (
+                <button className="w-full btn-secondary">
+                  Gérer les utilisateurs
+                </button>
+              )}
+              <button className="w-full btn-secondary">
+                Paramètres
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Statistiques par statut
+            </h3>
+            <div className="space-y-3">
+              {stats?.statsByStatus?.map((stat) => (
+                <div key={stat._id} className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">{stat._id}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {stat.count} ({((stat.count / stats.total) * 100).toFixed(1)}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Informations système
+            </h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Rôle:</span>
+                <span className="font-medium">{user?.role}</span>
+              </div>
+              {user?.boutique && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Boutique:</span>
+                  <span className="font-medium">{user.boutique}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-600">Dernière connexion:</span>
+                <span className="font-medium">
+                  {user?.derniereConnexion ? 
+                    format(new Date(user.derniereConnexion), 'dd/MM/yyyy HH:mm', { locale: fr }) :
+                    'N/A'
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
