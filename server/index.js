@@ -17,6 +17,11 @@ const googleSheetsRoutes = require('./routes/googleSheets');
 
 const app = express();
 const server = http.createServer(app);
+
+// 1. Configuration cruciale pour Vercel (DOIT être placé en premier)
+app.set('trust proxy', true); // Modification importante pour Vercel
+
+// Configuration Socket.IO après trust proxy
 const io = socketIo(server, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:3000",
@@ -26,11 +31,12 @@ const io = socketIo(server, {
 
 // Configuration de sécurité
 app.use(helmet());
-// 1. Configuration CORS avancée
+
+// Configuration CORS avancée
 const corsOptions = {
   origin: [
-    'https://frontend-nine-eta-99.vercel.app',
-    'http://localhost:3000' // Pour le développement
+    process.env.CLIENT_URL || 'http://localhost:3000',
+    'https://frontend-nine-eta-99.vercel.app'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-real-ip'],
@@ -38,24 +44,18 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-// 2. Middleware CORS (doit être placé avant les routes)
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
-// 3. Gestion explicite des requêtes OPTIONS (préflight)
-app.options('*', cors(corsOptions)); // Toutes les routes
-app.options('/api/*', cors(corsOptions)); // Spécifique aux API
-
-// 1. Configuration cruciale pour Vercel (DOIT être placé en premier)
-app.set('trust proxy', 1); // Faire confiance au premier proxy
-
-// 2. Middleware de sécurité (peut rester)
-app.use(helmet());
-
-// 3. Configuration du rate limiting APRÈS trust proxy
+// Configuration du rate limiting adapté pour Vercel
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  handler: (req, res) => { // Ajoutez ce handler
+  keyGenerator: (req) => {
+    // Utilisation de x-real-ip ou x-forwarded-for pour Vercel
+    return req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.ip;
+  },
+  handler: (req, res) => {
     res.status(429).json({
       error: "Trop de requêtes",
       message: "Veuillez réessayer plus tard"
@@ -79,6 +79,7 @@ app.use(session({
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
+    sameSite: 'none', // Important pour CORS avec credentials
     maxAge: 24 * 60 * 60 * 1000 // 24 heures
   }
 }));
@@ -106,7 +107,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Configuration Socket.IO pour les notifications en temps réel
+// Configuration Socket.IO
 io.on('connection', (socket) => {
   console.log('Nouveau client connecté:', socket.id);
 
@@ -120,15 +121,8 @@ io.on('connection', (socket) => {
   });
 });
 
-// Exporter io pour l'utiliser dans les routes
 app.set('io', io);
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
-});
-
-// Export unique et propre pour Vercel
-const handler = serverless(app);
-module.exports = handler; // Export principal pour Vercel
-module.exports.io = io;   // Export additionnel si nécessaire
+// Export pour Vercel
+module.exports = serverless(app);
+module.exports.io = io;
