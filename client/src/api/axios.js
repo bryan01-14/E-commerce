@@ -2,7 +2,8 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: 'https://backend-beta-blond-93.vercel.app/api',
-  timeout: 8000, // 8 secondes
+  timeout: 8000,
+  withCredentials: true , // 8 secondes
   headers: {
     'Cache-Control': 'no-cache',
     'Content-Type': 'application/json'

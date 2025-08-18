@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       console.time('Login');
-      const response = await axios.post('https://backend-beta-blond-93.vercel.app/api/auth/login', credentials);
+      const response = await axios.post('https://backend-beta-blond-93.vercel.app/api/auth/login', credentials,  { withCredentials: true });
       const { user, token } = response.data;
       console.timeEnd('Login');
       
