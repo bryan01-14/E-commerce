@@ -140,7 +140,7 @@ if (process.env.VERCEL) {
   module.exports = serverless(app);
 } else {
   // Mode développement local
-  const PORT = process.env.PORT || 3000;
+  const PORT = process.env.PORT || 5000;
   server.listen(PORT, () => {
     console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
     console.log(`Origines CORS autorisées: ${allowedOrigins.join(', ')}`);
