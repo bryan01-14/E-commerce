@@ -8,7 +8,6 @@ const MongoStore = require('connect-mongo');
 const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
-const serverless = require('serverless-http');
 
 const authRoutes = require('./routes/auth');
 const orderRoutes = require('./routes/orders');
@@ -18,33 +17,18 @@ const googleSheetsRoutes = require('./routes/googleSheets');
 const app = express();
 const server = http.createServer(app);
 
-// 1. Configuration cruciale pour Vercel
-app.set('trust proxy', true);
+// Configuration de base
+app.set('trust proxy', 1); // Important pour Vercel
 
-// 2. Configuration Socket.IO
-const io = socketIo(server, {
-  cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000" || "https://frontend-nine-eta-99.vercel.app",
-    methods: ["GET", "POST"],
-    credentials: true
-  }
-});
+// Configuration CORS simplifiée et efficace
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'https://frontend-nine-eta-99.vercel.app',
+  'http://localhost:3000'
+].filter(Boolean);
 
-// 1. Configuration CORS infaillible
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Autoriser toutes les origines en développement
-    if (process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-    
-    // Liste des origines autorisées en production
-    const allowedOrigins = [
-      process.env.FRONTEND_URL,
-      'https://frontend-nine-eta-99.vercel.app',
-      'http://localhost:3000'
-    ];
-    
+app.use(cors({
+  origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -54,98 +38,72 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  optionsSuccessStatus: 204
-};
+  optionsSuccessStatus: 200
+}));
 
-// 2. Middleware CORS
-app.use(cors(corsOptions));
-
-// 3. Gestion manuelle des requêtes OPTIONS
-app.options('*', cors(corsOptions));
-
-// 4. Configuration essentielle pour Vercel
-app.set('trust proxy', true);
-
-// 5. Middleware pour headers CORS supplémentaires
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.header('Vary', 'Origin');
-  next();
-});
-
-// Route de test CORS
-app.get('/api/cors-test', (req, res) => {
-  res.json({ status: 'CORS fonctionnel!', timestamp: Date.now() });
-});
-
-// 6. Configuration de sécurité
+// Middleware de sécurité
 app.use(helmet());
-
-// 7. Rate limiting adapté pour Vercel
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  keyGenerator: (req) => {
-    return req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.ip;
-  },
-  handler: (req, res) => {
-    res.status(429).json({
-      error: "Trop de requêtes",
-      message: "Veuillez réessayer plus tard"
-    });
-  }
-});
-app.use(limiter);
-
-// 8. Middleware pour parser le JSON
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// 9. Configuration des sessions
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// Configuration des sessions
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({
-    mongoUrl: process.env.MONGODB_URI || 'mongodb+srv://e-commerce:e-commerce@e-commerce.ctxpjj8.mongodb.net/',
-    ttl: 24 * 60 * 60 // 1 jour
+    mongoUrl: process.env.MONGODB_URI,
+    ttl: 24 * 60 * 60
   }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000 // 24 heures
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
-// 10. Connexion à MongoDB
+// Connexion à MongoDB
 connectDB();
 
-// 11. Routes
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/google-sheets', googleSheetsRoutes);
 
-// 12. Route de test
+// Route de test
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Serveur opérationnel' });
+  res.json({ status: 'OK', timestamp: Date.now() });
 });
 
-// 13. Gestion des erreurs globales
+// Route de test CORS
+app.get('/api/cors-test', (req, res) => {
+  res.json({ 
+    status: 'CORS fonctionnel!', 
+    timestamp: Date.now(),
+    origin: req.headers.origin
+  });
+});
+
+// Gestion des erreurs
 app.use((err, req, res, next) => {
   console.error(err.stack);
   
   if (err.message === 'Not allowed by CORS') {
     return res.status(403).json({ 
       error: 'Accès interdit',
-      message: 'Origine non autorisée'
+      message: 'Origine non autorisée',
+      allowedOrigins
     });
   }
   
@@ -155,22 +113,36 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 14. Configuration Socket.IO
-io.on('connection', (socket) => {
-  console.log('Nouveau client connecté:', socket.id);
-
-  socket.on('join-room', (room) => {
-    socket.join(room);
-    console.log(`Client ${socket.id} a rejoint la room: ${room}`);
+// Configuration Socket.IO (uniquement en mode développement)
+if (process.env.NODE_ENV !== 'production') {
+  const io = socketIo(server, {
+    cors: {
+      origin: allowedOrigins,
+      methods: ["GET", "POST"],
+      credentials: true
+    }
   });
 
-  socket.on('disconnect', () => {
-    console.log('Client déconnecté:', socket.id);
+  io.on('connection', (socket) => {
+    console.log('Nouveau client connecté:', socket.id);
+    socket.on('disconnect', () => {
+      console.log('Client déconnecté:', socket.id);
+    });
   });
-});
 
-app.set('io', io);
+  app.set('io', io);
+}
 
-// 15. Export pour Vercel
-module.exports = serverless(app);
-module.exports.io = io;
+// Configuration pour Vercel vs développement local
+if (process.env.VERCEL) {
+  // Mode production Vercel (Serverless)
+  const serverless = require('serverless-http');
+  module.exports = serverless(app);
+} else {
+  // Mode développement local
+  const PORT = process.env.PORT || 3000;
+  server.listen(PORT, () => {
+    console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
+    console.log(`Origines CORS autorisées: ${allowedOrigins.join(', ')}`);
+  });
+}
