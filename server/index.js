@@ -26,10 +26,24 @@ const io = socketIo(server, {
 
 // Configuration de sécurité
 app.use(helmet());
-app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
-  credentials: true
-}));
+// 1. Configuration CORS avancée
+const corsOptions = {
+  origin: [
+    'https://frontend-nine-eta-99.vercel.app',
+    'http://localhost:3000' // Pour le développement
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-real-ip'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+// 2. Middleware CORS (doit être placé avant les routes)
+app.use(cors(corsOptions));
+
+// 3. Gestion explicite des requêtes OPTIONS (préflight)
+app.options('*', cors(corsOptions)); // Toutes les routes
+app.options('/api/*', cors(corsOptions)); // Spécifique aux API
 
 // 1. Configuration cruciale pour Vercel (DOIT être placé en premier)
 app.set('trust proxy', 1); // Faire confiance au premier proxy
