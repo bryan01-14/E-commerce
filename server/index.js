@@ -8,6 +8,7 @@ const MongoStore = require('connect-mongo');
 const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
+const serverless = require('serverless-http');
 
 const authRoutes = require('./routes/auth');
 const orderRoutes = require('./routes/orders');
@@ -15,43 +16,45 @@ const userRoutes = require('./routes/users');
 const googleSheetsRoutes = require('./routes/googleSheets');
 
 const app = express();
-const server = http.createServer(app);
 
 // Configuration de base
-app.set('trust proxy', 1); // Important pour Vercel
+app.set('trust proxy', 1);
 
-// Configuration CORS simplifiée et efficace
+// Configuration CORS
 const allowedOrigins = [
   process.env.CLIENT_URL,
   'https://frontend-nine-eta-99.vercel.app',
   'http://localhost:3000'
 ].filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+const corsOptions = {
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   optionsSuccessStatus: 200
-}));
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Middleware de sécurité
 app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
+// Rate limiting corrigé
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    return req.ip || 
+           req.headers['x-real-ip'] || 
+           req.headers['x-forwarded-for'] || 
+           req.socket.remoteAddress;
+  }
 });
 app.use(limiter);
 
@@ -81,17 +84,20 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/google-sheets', googleSheetsRoutes);
 
-// Route de test
+// Routes de test
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: Date.now() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: Date.now(),
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
 
-// Route de test CORS
 app.get('/api/cors-test', (req, res) => {
   res.json({ 
-    status: 'CORS fonctionnel!', 
-    timestamp: Date.now(),
-    origin: req.headers.origin
+    status: 'CORS fonctionnel!',
+    origin: req.headers.origin,
+    allowedOrigins
   });
 });
 
@@ -113,8 +119,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Configuration Socket.IO (uniquement en mode développement)
-if (process.env.NODE_ENV !== 'production') {
+// Configuration pour Vercel vs développement local
+if (process.env.VERCEL) {
+  // Mode production Vercel (Serverless)
+  module.exports = serverless(app);
+} else {
+  // Mode développement local
+  const PORT = process.env.PORT || 5000;
+  const server = http.createServer(app);
+  
+  // Configuration Socket.IO seulement en local
   const io = socketIo(server, {
     cors: {
       origin: allowedOrigins,
@@ -131,36 +145,9 @@ if (process.env.NODE_ENV !== 'production') {
   });
 
   app.set('io', io);
-}
 
-// Remplacez la partie finale par :
-
-const PORT = process.env.PORT || 5000;
-
-if (require.main === module) {
-  // Mode développement local
-  const server = app.listen(PORT, () => {
-    console.log(`Serveur Express sur http://localhost:${PORT}`);
+  server.listen(PORT, () => {
+    console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
+    console.log(`Origines CORS autorisées: ${allowedOrigins.join(', ')}`);
   });
-  
-  // Configuration Socket.IO seulement en local
-  const io = require('socket.io')(server, {
-    cors: {
-      origin: allowedOrigins,
-      methods: ["GET", "POST"],
-      credentials: true
-    }
-  });
-  
-  io.on('connection', (socket) => {
-    console.log('Nouveau client connecté:', socket.id);
-    socket.on('disconnect', () => {
-      console.log('Client déconnecté:', socket.id);
-    });
-  });
-  
-  app.set('io', io);
-} else {
-  // Mode production Vercel
-  module.exports = app;
 }
