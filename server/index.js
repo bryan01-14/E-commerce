@@ -8,7 +8,6 @@ const MongoStore = require('connect-mongo');
 const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
-const serverless = require('serverless-http');
 
 const authRoutes = require('./routes/auth');
 const orderRoutes = require('./routes/orders');
@@ -27,33 +26,27 @@ const allowedOrigins = [
   'http://localhost:3000'
 ].filter(Boolean);
 
-const corsOptions = {
+app.use(cors({
   origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+}));
 
 // Middleware de sécurité
 app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting corrigé
+// Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    return req.ip || 
-           req.headers['x-real-ip'] || 
-           req.headers['x-forwarded-for'] || 
-           req.socket.remoteAddress;
+    return req.ip || req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   }
 });
 app.use(limiter);
@@ -78,13 +71,13 @@ app.use(session({
 // Connexion à MongoDB
 connectDB();
 
-// Routes
+// Routes API
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/google-sheets', googleSheetsRoutes);
 
-// Routes de test
+// Route de test
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -93,42 +86,33 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.get('/api/cors-test', (req, res) => {
-  res.json({ 
-    status: 'CORS fonctionnel!',
-    origin: req.headers.origin,
-    allowedOrigins
+// Route racine
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Bienvenue sur le serveur API',
+    endpoints: {
+      health: '/api/health',
+      docs: '/api-docs',
+      api: '/api'
+    }
   });
 });
 
 // Gestion des erreurs
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({ 
-      error: 'Accès interdit',
-      message: 'Origine non autorisée',
-      allowedOrigins
-    });
-  }
-  
   res.status(500).json({ 
     error: 'Erreur interne du serveur',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Une erreur est survenue'
   });
 });
 
-// Configuration pour Vercel vs développement local
-if (process.env.VERCEL) {
-  // Mode production Vercel (Serverless)
-  module.exports = serverless(app);
-} else {
-  // Mode développement local
+// Mode développement local
+if (require.main === module) {
   const PORT = process.env.PORT || 5000;
   const server = http.createServer(app);
   
-  // Configuration Socket.IO seulement en local
+  // Configuration Socket.IO
   const io = socketIo(server, {
     cors: {
       origin: allowedOrigins,
@@ -148,6 +132,7 @@ if (process.env.VERCEL) {
 
   server.listen(PORT, () => {
     console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
-    console.log(`Origines CORS autorisées: ${allowedOrigins.join(', ')}`);
   });
 }
+
+module.exports = app;
