@@ -30,36 +30,59 @@ const io = socketIo(server, {
   }
 });
 
-// 3. Configuration CORS avancée
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  'http://localhost:3000',
-  'https://frontend-nine-eta-99.vercel.app'
-].filter(Boolean); // Supprime les valeurs undefined
-
+// 1. Configuration CORS infaillible
 const corsOptions = {
   origin: function (origin, callback) {
-    // Autoriser les requêtes sans origine (comme Postman)
-    if (!origin) return callback(null, true);
+    // Autoriser toutes les origines en développement
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // Liste des origines autorisées en production
+    const allowedOrigins = [
+      process.env.FRONTEND_URL,
+      'https://votre-frontend.vercel.app',
+      'http://localhost:3000'
+    ];
+    
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-real-ip'],
   credentials: true,
-  optionsSuccessStatus: 200,
-  preflightContinue: false
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 204
 };
 
-// 4. Middleware CORS pour toutes les routes
+// 2. Middleware CORS
 app.use(cors(corsOptions));
 
-// 5. Gestion explicite des requêtes OPTIONS
+// 3. Gestion manuelle des requêtes OPTIONS
 app.options('*', cors(corsOptions));
+
+// 4. Configuration essentielle pour Vercel
+app.set('trust proxy', true);
+
+// 5. Middleware pour headers CORS supplémentaires
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Vary', 'Origin');
+  next();
+});
+
+// Route de test CORS
+app.get('/api/cors-test', (req, res) => {
+  res.json({ status: 'CORS fonctionnel!', timestamp: Date.now() });
+});
 
 // 6. Configuration de sécurité
 app.use(helmet());

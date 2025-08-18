@@ -6,7 +6,8 @@ const api = axios.create({
   withCredentials: true , // 8 secondes
   headers: {
     'Cache-Control': 'no-cache',
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+     'X-Requested-With': 'XMLHttpRequest'
   }
 });
 
