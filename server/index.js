@@ -31,10 +31,20 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// 1. Configuration cruciale pour Vercel (DOIT être placé en premier)
+app.set('trust proxy', 1); // Faire confiance au premier proxy
+
+// 2. Middleware de sécurité (peut rester)
+app.use(helmet());
+
+// 3. Configuration du rate limiting APRÈS trust proxy
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limite chaque IP à 100 requêtes par fenêtre
+  max: 100,
+  keyGenerator: (req) => {
+    // Méthode fiable pour obtenir l'IP sur Vercel
+    return req.headers['x-real-ip'] || req.ip;
+  }
 });
 app.use(limiter);
 
