@@ -28,24 +28,30 @@ export const AuthProvider = ({ children }) => {
 
   // Vérifier l'authentification au chargement
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        if (token) {
-          const response = await axios.get('/auth/me', {
-            baseURL: process.env.REACT_APP_API_URL,
-            withCredentials: true
-          });
-          setUser(response.data.user);
-        }
-      } catch (error) {
-        console.error('Erreur auth:', error);
-        if (error.response?.status === 401) {
-          logout(); // Déconnecter seulement si 401
-        }
-      } finally {
-        setLoading(false);
+// Dans votre AuthContext.js
+const checkAuth = async () => {
+  try {
+    const response = await axios.get('/api/auth/me', {
+      withCredentials: true,
+      baseURL: process.env.REACT_APP_API_URL
+    });
+    
+    if (response.data.user) {
+      setUser(response.data.user);
+      // Stockez le token si vous utilisez JWT
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
       }
-    };
+    }
+  } catch (error) {
+    console.error('Erreur vérification auth:', error);
+    if (error.response?.status === 401) {
+      logout();
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
     checkAuth();
   }, [token]);

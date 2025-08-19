@@ -24,6 +24,7 @@ const allowedOrigins = [
   process.env.CLIENT_URL,
   'https://frontend-nine-eta-99.vercel.app',
   'http://localhost:3000',
+  'https://backend-beta-blond-93.vercel.app'
 ].filter(Boolean);
 
 app.use(cors({
@@ -31,7 +32,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  optionsSuccessStatus: 200
+  exposedHeaders: ['set-cookie']
 }));
 
 // Middleware de sécurité
@@ -51,9 +52,9 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Configuration des sessions
+// Dans votre configuration de session (backend)
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({
@@ -64,7 +65,8 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000
+    maxAge: 24 * 60 * 60 * 1000,
+    domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : 'localhost'
   }
 }));
 
@@ -118,11 +120,10 @@ app.use((req, res, next) => {
 });
 
 // Mode développement local
-if (require.main === module) {
-  const PORT = process.env.PORT || 5000;
+// Dans votre backend
+if (process.env.VERCEL) {
+  // Configuration pour Vercel
   const server = http.createServer(app);
-  
-  // Configuration Socket.IO
   const io = socketIo(server, {
     cors: {
       origin: allowedOrigins,
@@ -130,18 +131,20 @@ if (require.main === module) {
       credentials: true
     }
   });
-
-  io.on('connection', (socket) => {
-    console.log('Nouveau client connecté:', socket.id);
-    socket.on('disconnect', () => {
-      console.log('Client déconnecté:', socket.id);
-    });
+  
+  module.exports = { app, server };
+} else {
+  // Configuration pour développement local
+  const PORT = process.env.PORT || 5000;
+  const server = app.listen(PORT, () => {
+    console.log(`Serveur sur http://localhost:${PORT}`);
   });
-
-  app.set('io', io);
-
-  server.listen(PORT, () => {
-    console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
+  
+  const io = socketIo(server, {
+    cors: {
+      origin: "http://localhost:3000",
+      credentials: true
+    }
   });
 }
 

@@ -180,22 +180,14 @@ router.post('/register', async (req, res) => {
     });
   }
 });
-// Ajoutez cette route avant les autres routes
-router.get('/auth/me', async (req, res) => {
+// routes/auth.js
+router.get('/me', async (req, res) => {
   try {
-    // Vérifiez le token depuis les cookies ou headers
-    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
+    if (!req.session.userId) {
       return res.status(401).json({ error: 'Non authentifié' });
     }
 
-    // Décoder le token JWT (si vous utilisez JWT)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Récupérer l'utilisateur depuis la DB
-    const user = await User.findById(decoded.userId).select('-password');
-    
+    const user = await User.findById(req.session.userId).select('-password');
     if (!user) {
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
