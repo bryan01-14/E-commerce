@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const connectDB = require('./config/database');
 const cors = require('cors');
@@ -7,17 +8,9 @@ const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const http = require('http');
 const socketIo = require('socket.io');
-require('dotenv').config();
-
-const authRoutes = require('./routes/auth');
-const orderRoutes = require('./routes/orders');
-const userRoutes = require('./routes/users');
-const googleSheetsRoutes = require('./routes/googleSheets');
 
 const app = express();
-
-// Configuration de base
-app.set('trust proxy', 1);
+const server = http.createServer(app);
 
 // Configuration CORS
 const allowedOrigins = [
@@ -35,24 +28,22 @@ app.use(cors({
   exposedHeaders: ['set-cookie']
 }));
 
-// Middleware de sécurité
-app.use(helmet());
+// Middlewares
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(helmet());
 
-// Rate limiting
+// Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.ip || req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-  }
+  keyGenerator: (req) => req.ip || req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress
 });
 app.use(limiter);
 
-// Dans votre configuration de session (backend)
+// Session Configuration
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -73,79 +64,62 @@ app.use(session({
 // Connexion à MongoDB
 connectDB();
 
-// Routes API
-app.use('/api/auth', authRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/google-sheets', googleSheetsRoutes);
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/orders', require('./routes/orders'));
+app.use('/api/users', require('./routes/users'));
+app.use('/api/google-sheets', require('./routes/googleSheets'));
 
-// Route de test
+// Health Check
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
-    timestamp: Date.now(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
   });
 });
 
-// Route racine
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Bienvenue sur le serveur API',
-    endpoints: {
-      health: '/api/health',
-      docs: '/api-docs',
-      api: '/api'
-    }
+// Socket.IO Configuration
+const io = socketIo(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log('New client connected:', socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
   });
 });
 
-// Gestion des erreurs
+// Error Handling Middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ 
-    error: 'Erreur interne du serveur',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Une erreur est survenue'
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
   });
 });
 
-// Middleware anti-timeout
+// Timeout Handling
 app.use((req, res, next) => {
-  req.setTimeout(5000, () => {
+  req.setTimeout(10000, () => {
     if (!res.headersSent) {
-      res.status(504).json({ error: 'Timeout' });
+      res.status(504).json({ error: 'Request timeout' });
     }
   });
   next();
 });
 
-// Mode développement local
-// Dans votre backend
-if (process.env.VERCEL) {
-  // Configuration pour Vercel
-  const server = http.createServer(app);
-  const io = socketIo(server, {
-    cors: {
-      origin: allowedOrigins,
-      methods: ["GET", "POST"],
-      credentials: true
-    }
-  });
-  
-  module.exports = { app, server };
-} else {
-  // Configuration pour développement local
-  const PORT = process.env.PORT || 5000;
-  const server = app.listen(PORT, () => {
-    console.log(`Serveur sur http://localhost:${PORT}`);
-  });
-  
-  const io = socketIo(server, {
-    cors: {
-      origin: "http://localhost:3000",
-      credentials: true
-    }
-  });
-}
+// Start Server
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
+});
 
-module.exports = app;
+module.exports = { app, server };
