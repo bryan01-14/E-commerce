@@ -180,7 +180,7 @@ router.post('/register', async (req, res) => {
     });
   }
 });
-// routes/auth.js
+// Supprimer cette section en double :
 // Route pour vérifier l'authentification
 router.get('/me', authenticate, async (req, res) => {
   try {
@@ -266,13 +266,13 @@ router.post('/logout', (req, res) => {
   });
 });
 
-// Route pour vérifier l'authentification
-router.get('/me', authenticate, (req, res) => {
-  res.json({
-    user: req.user.toPublicJSON(),
-    sessionId: req.sessionID
-  });
-});
+// // Route pour vérifier l'authentification
+// router.get('/me', authenticate, (req, res) => {
+//   res.json({
+//     user: req.user.toPublicJSON(),
+//     sessionId: req.sessionID
+//   });
+// });
 
 // Route pour vérifier s'il existe déjà un admin principal
 router.get('/check-admin', async (req, res) => {

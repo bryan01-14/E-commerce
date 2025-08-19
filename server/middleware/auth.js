@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Middleware pour vérifier l'authentification
+
+
 const authenticate = async (req, res, next) => {
   try {
     // Vérifier d'abord la session
@@ -13,7 +14,7 @@ const authenticate = async (req, res, next) => {
       }
     }
 
-    // Si pas de session, vérifier le token JWT dans l'en-tête Authorization
+    // Si pas de session, vérifier le token JWT
     const authHeader = req.header('Authorization');
     if (!authHeader) {
       return res.status(401).json({ 
@@ -21,7 +22,6 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    // Support de différents formats d'autorisation
     let token;
     if (authHeader.startsWith('Bearer ')) {
       token = authHeader.substring(7);

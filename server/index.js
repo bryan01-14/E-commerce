@@ -19,20 +19,28 @@ const app = express();
 // Configuration de base
 app.set('trust proxy', 1);
 
-// Configuration CORS
+// Configuration CORS améliorée
 const allowedOrigins = [
   process.env.CLIENT_URL,
   'https://frontend-nine-eta-99.vercel.app',
   'http://localhost:3000',
-  "https://backend-beta-blond-93.vercel.app"
+  'https://backend-beta-blond-93.vercel.app'
 ].filter(Boolean);
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  optionsSuccessStatus: 200
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // Middleware de sécurité
