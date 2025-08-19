@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'https://backend-beta-blond-93.vercel.app/api',
   timeout: 10000,
@@ -27,3 +29,5 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export default api;
