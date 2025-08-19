@@ -34,7 +34,7 @@ const Layout = () => {
     ...(user?.role === 'livreur' ? [{ name: 'commande', href: '/orderlivreur', icon: Users }] : []),
     ...(user?.role === 'admin' || user?.role === 'closeur'  ? [{ name: 'attribuer Commandes', href: '/orders', icon: Package }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Utilisateurs', href: '/users', icon: Users }] : []),
-    ...(user?.role === 'admin' ? [{ name: 'Google Sheets', href: '/google-sheets', icon: Database }] : []),
+    ...(user?.role === 'admin' ? [{ name: 'Total des commandes', href: '/google-sheets', icon: Database }] : []),
     { name: 'Paramètres', href: '/settings', icon: Settings },
   ];
 
@@ -140,7 +140,7 @@ const Layout = () => {
                   <WifiOff className="h-4 w-4 text-danger-500" />
                 )}
                 <span className="text-xs text-gray-500">
-                  {connected ? 'Connecté' : 'Déconnecté'}
+                  {connected ? 'Déconnecté' : ' Connecté'}
                 </span>
               </div>
 
