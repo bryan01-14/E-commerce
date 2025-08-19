@@ -32,7 +32,7 @@ const Layout = () => {
     { name: 'Tableau de bord', href: '/dashboard', icon: Home },
     // { name: 'Commandes', href: '/orders', icon: Package },
     ...(user?.role === 'livreur' ? [{ name: 'commande', href: '/orderlivreur', icon: Users }] : []),
-    ...(user?.role === 'admin' || user?.role === 'admin'  ? [{ name: 'Commandes', href: '/orders', icon: Package }] : []),
+    ...(user?.role === 'admin' || user?.role === 'closeur'  ? [{ name: 'attribuer Commandes', href: '/orders', icon: Package }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Utilisateurs', href: '/users', icon: Users }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Google Sheets', href: '/google-sheets', icon: Database }] : []),
     { name: 'Paramètres', href: '/settings', icon: Settings },
