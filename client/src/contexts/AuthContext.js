@@ -17,8 +17,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // Configurer axios avec le token
+  // Configurer axios avec les options par défaut
   useEffect(() => {
+    axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'https://backend-beta-blond-93.vercel.app';
+    axios.defaults.withCredentials = true; // Important pour les cookies de session
+    
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
@@ -28,41 +31,36 @@ export const AuthProvider = ({ children }) => {
 
   // Vérifier l'authentification au chargement
   useEffect(() => {
-// Dans votre AuthContext.js
-const checkAuth = async () => {
-  try {
-    const response = await axios.get('https://backend-beta-blond-93.vercel.app/api/auth/me', {
-      withCredentials: true,
-      baseURL: process.env.REACT_APP_API_URL
-    });
-    
-    if (response.data.user) {
-      setUser(response.data.user);
-      // Stockez le token si vous utilisez JWT
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
+    const checkAuth = async () => {
+      try {
+        const response = await axios.get('/api/auth/me');
+        
+        if (response.data.user) {
+          setUser(response.data.user);
+          // Mettre à jour le token si nécessaire
+          if (response.data.token) {
+            setToken(response.data.token);
+            localStorage.setItem('token', response.data.token);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur vérification auth:', error);
+        if (error.response?.status === 401) {
+          logout();
+        }
+      } finally {
+        setLoading(false);
       }
-    }
-  } catch (error) {
-    console.error('Erreur vérification auth:', error);
-    if (error.response?.status === 401) {
-      logout();
-    }
-  } finally {
-    setLoading(false);
-  }
-};
+    };
 
     checkAuth();
-  }, [token]);
+  }, []);
 
   // Fonction de connexion
   const login = async (credentials) => {
     try {
-      console.time('Login');
-      const response = await axios.post('https://backend-beta-blond-93.vercel.app/api/auth/login', credentials,  { withCredentials: true });
+      const response = await axios.post('/api/auth/login', credentials);
       const { user, token } = response.data;
-      console.timeEnd('Login');
       
       setUser(user);
       setToken(token);
@@ -71,6 +69,7 @@ const checkAuth = async () => {
       toast.success('Connexion réussie');
       return { success: true };
     } catch (error) {
+      console.error('Erreur de connexion:', error);
       const message = error.response?.data?.error || 'Erreur de connexion';
       toast.error(message);
       return { success: false, error: message };
@@ -78,22 +77,24 @@ const checkAuth = async () => {
   };
 
   // Fonction de déconnexion
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
-    
-    // Appeler l'API de déconnexion
-    axios.post('https://backend-beta-blond-93.vercel.app/api/auth/logout').catch(console.error);
-    
-    toast.success('Déconnexion réussie');
+  const logout = async () => {
+    try {
+      await axios.post('/api/auth/logout');
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion API:', error);
+    } finally {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('token');
+      delete axios.defaults.headers.common['Authorization'];
+      toast.success('Déconnexion réussie');
+    }
   };
 
   // Fonction de changement de mot de passe
   const changePassword = async (passwords) => {
     try {
-      await axios.post('https://backend-beta-blond-93.vercel.app/api/auth/change-password', passwords);
+      await axios.post('/api/auth/change-password', passwords);
       toast.success('Mot de passe modifié avec succès');
       return { success: true };
     } catch (error) {
@@ -106,7 +107,7 @@ const checkAuth = async () => {
   // Fonction de mise à jour du profil
   const updateProfile = async (profileData) => {
     try {
-      const response = await axios.put(`https://backend-beta-blond-93.vercel.app/api/users/${user._id}`, profileData);
+      const response = await axios.put(`/api/users/${user._id}`, profileData);
       setUser(response.data.user);
       toast.success('Profil mis à jour avec succès');
       return { success: true };

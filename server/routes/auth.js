@@ -181,20 +181,20 @@ router.post('/register', async (req, res) => {
   }
 });
 // routes/auth.js
-router.get('/me', async (req, res) => {
+// Route pour vérifier l'authentification
+router.get('/me', authenticate, async (req, res) => {
   try {
-    if (!req.session.userId) {
-      return res.status(401).json({ error: 'Non authentifié' });
-    }
-
-    const user = await User.findById(req.session.userId).select('-password');
+    const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
     }
-
-    res.json({ user });
-  } catch (err) {
-    console.error('Erreur auth/me:', err);
+    
+    res.json({
+      user: user.toPublicJSON(),
+      sessionId: req.sessionID
+    });
+  } catch (error) {
+    console.error('Erreur route /me:', error);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });

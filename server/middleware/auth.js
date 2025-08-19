@@ -1,4 +1,3 @@
-// middleware/auth.js
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
@@ -14,12 +13,25 @@ const authenticate = async (req, res, next) => {
       }
     }
 
-    // Si pas de session, vérifier le token JWT
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
+    // Si pas de session, vérifier le token JWT dans l'en-tête Authorization
+    const authHeader = req.header('Authorization');
+    if (!authHeader) {
       return res.status(401).json({ 
         error: 'Accès refusé. Token ou session manquant.' 
+      });
+    }
+
+    // Support de différents formats d'autorisation
+    let token;
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else {
+      token = authHeader;
+    }
+
+    if (!token) {
+      return res.status(401).json({ 
+        error: 'Token manquant.' 
       });
     }
 
@@ -36,8 +48,21 @@ const authenticate = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Erreur d\'authentification:', error);
-    res.status(401).json({ 
-      error: 'Token invalide.' 
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        error: 'Token invalide.' 
+      });
+    }
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        error: 'Token expiré.' 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Erreur d\'authentification.' 
     });
   }
 };
@@ -69,25 +94,30 @@ const requireCloseur = authorize(['admin', 'closeur']);
 
 // Middleware spécifique pour les livreurs
 const requireLivreur = authorize(['admin', 'closeur', 'livreur']);
-// middleware/auth.js
+
+// Middleware pour vérifier le rôle
 const requireRole = (roles) => {
   return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'Utilisateur non authentifié'
+      });
+    }
+
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
-        success: false,
-        message: 'Accès non autorisé'
+        error: 'Accès non autorisé'
       });
     }
     next();
   };
 };
 
-
 module.exports = {
-  requireRole,
   authenticate,
   authorize,
   requireAdmin,
   requireCloseur,
-  requireLivreur
+  requireLivreur,
+  requireRole
 };
