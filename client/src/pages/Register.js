@@ -31,7 +31,7 @@ const Register = () => {
       }
 
       // Créer le premier admin principal
-      const response = await api.post('/auth/register', {
+      await api.post('/auth/register', {
         ...data,
         role: 'admin'
       });

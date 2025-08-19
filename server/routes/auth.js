@@ -70,6 +70,7 @@ router.post('/login', loginValidation, async (req, res) => {
     });
 
     if (!user) {
+      console.warn('[AUTH] Login échec: utilisateur introuvable/inactif', { username });
       return res.status(401).json({ 
         error: 'Nom d\'utilisateur ou mot de passe incorrect' 
       });
@@ -78,6 +79,7 @@ router.post('/login', loginValidation, async (req, res) => {
     // Vérifier le mot de passe
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
+      console.warn('[AUTH] Login échec: mot de passe invalide', { userId: user._id.toString() });
       return res.status(401).json({ 
         error: 'Nom d\'utilisateur ou mot de passe incorrect' 
       });

@@ -8,7 +8,6 @@ import {
   MapPin, 
   Phone, 
   User, 
-  Calendar,
   CheckCircle,
   XCircle,
   Clock,
@@ -52,7 +51,7 @@ const LivreurDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [user._id]);
+  }, []);
 
   // Mettre à jour le statut d'une commande
   const updateOrderStatus = async (orderId, newStatus) => {

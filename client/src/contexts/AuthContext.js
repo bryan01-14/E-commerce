@@ -1,5 +1,5 @@
 // contexts/AuthContext.js
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
 
   // L'instance API gère déjà baseURL, withCredentials et le token via intercepteur
 
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       // Ne pas appeler l'API s'il n'y a pas de token (évite un 401 au chargement)
       const existingToken = localStorage.getItem('token');
@@ -68,11 +68,11 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, [checkAuth]);
 
   const login = async (credentials) => {
     try {
@@ -109,6 +109,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     loading,
+    token,
     login,
     logout,
     checkAuth,
