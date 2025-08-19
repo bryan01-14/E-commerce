@@ -26,63 +26,103 @@ router.get('/google-sheets/data', authenticate, requireRole(['admin', 'closeur']
 
 // Attribution des commandes (création en base)
 router.post('/assign-from-sheets', authenticate, requireRole(['admin', 'closeur']), async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
+    console.log('Données reçues:', JSON.stringify(req.body, null, 2));
+
     const { livreurId, sheetOrders } = req.body;
 
-    // Validation des champs obligatoires
-    const validOrders = sheetOrders.filter(order => 
-      order.numeroCommande && 
-      order.clientNom &&
-      order.adresseLivraison
-    );
-
-    if (validOrders.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Aucune commande valide à traiter'
-      });
+    // Validation renforcée
+    if (!mongoose.Types.ObjectId.isValid(livreurId)) {
+      throw new Error('ID livreur invalide');
     }
 
-    // Traitement
-    const results = await Promise.all(validOrders.map(async (order) => {
-      const orderData = {
-        ...order,
-        livreurId,
-        status: 'attribué',
-        dateAttribution: new Date()
-      };
+    if (!Array.isArray(sheetOrders)) {
+      throw new Error('sheetOrders doit être un tableau');
+    }
 
-      const existing = await Order.findOne({
-        $or: [
-          { numeroCommande: order.numeroCommande },
-          { googleSheetsId: order.googleSheetsId }
-        ]
-      });
+    // Vérification du livreur avec session
+    const livreur = await User.findById(livreurId).session(session);
+    if (!livreur || livreur.role !== 'livreur') {
+      throw new Error('Livreur non valide');
+    }
 
-      if (existing) {
-        await Order.updateOne({ _id: existing._id }, orderData);
-        return { action: 'updated' };
-      } else {
-        await Order.create(orderData);
-        return { action: 'created' };
+    let createdCount = 0;
+    let updatedCount = 0;
+    const errors = [];
+
+    // Traitement transactionnel
+    for (const orderData of sheetOrders) {
+      try {
+        // Validation des champs obligatoires
+        if (!orderData.numeroCommande) {
+          throw new Error('Numéro de commande manquant');
+        }
+
+        const filter = {
+          $or: [
+            { numeroCommande: orderData.numeroCommande },
+            { googleSheetsId: orderData.googleSheetsId }
+          ]
+        };
+
+        const update = {
+          $set: {
+            ...orderData,
+            livreurId: livreur._id,
+            status: 'attribué',
+            dateAttribution: new Date(),
+            updatedAt: new Date()
+          },
+          $setOnInsert: {
+            createdAt: new Date()
+          }
+        };
+
+        const options = { 
+          upsert: true,
+          new: true,
+          session
+        };
+
+        const result = await Order.findOneAndUpdate(filter, update, options);
+
+        if (result.$isNewRecord) {
+          createdCount++;
+        } else {
+          updatedCount++;
+        }
+
+      } catch (error) {
+        console.error('Erreur commande:', orderData.numeroCommande, error);
+        errors.push({
+          order: orderData.numeroCommande,
+          error: error.message
+        });
       }
-    }));
+    }
 
-    const createdCount = results.filter(r => r.action === 'created').length;
-    const updatedCount = results.filter(r => r.action === 'updated').length;
+    await session.commitTransaction();
+    session.endSession();
 
-    return res.json({
+    res.json({
       success: true,
-      message: `${createdCount} commande(s) traitées avec succès`,
+      message: `${createdCount} créée(s), ${updatedCount} mise(s) à jour`,
       createdCount,
-      updatedCount
+      updatedCount,
+      errorCount: errors.length,
+      errors
     });
 
   } catch (error) {
-    console.error('Erreur:', error);
-    return res.status(500).json({
+    await session.abortTransaction();
+    session.endSession();
+    console.error('Erreur globale:', error);
+    res.status(500).json({
       success: false,
-      error: 'Erreur de traitement'
+      error: error.message
     });
   }
 });
