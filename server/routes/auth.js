@@ -267,29 +267,24 @@ router.post('/logout', (req, res) => {
   });
 });
 
-router.get('/me', authenticate, async (req, res) => {
-  try {
-    // Régénérer le token à chaque vérification pour prolonger sa validité
-    const token = jwt.sign(
-      { 
-        userId: req.user._id, 
-        role: req.user.role,
-        boutique: req.user.boutique 
-      },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: process.env.JWT_EXPIRE || '24h' }
-    );
+router.get('/me', authenticate, (req, res) => {
+  const token = jwt.sign(
+    { 
+      userId: req.user._id, 
+      role: req.user.role,
+      boutique: req.user.boutique 
+    },
+    process.env.JWT_SECRET || 'your-secret-key',
+    { expiresIn: process.env.JWT_EXPIRE || '24h' }
+  );
 
-    res.json({
-      user: req.user.toPublicJSON(),
-      token, // Renvoyer le nouveau token
-      sessionId: req.sessionID
-    });
-  } catch (error) {
-    console.error('Erreur route /me:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
+  res.json({
+    user: req.user.toPublicJSON(),
+    token, // ← AJOUTER le token ici
+    sessionId: req.sessionID
+  });
+}
+);
 
 // Route pour vérifier s'il existe déjà un admin principal
 router.get('/check-admin', async (req, res) => {
