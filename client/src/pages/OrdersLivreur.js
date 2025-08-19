@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from '../contexts/AuthContext';
-import axios from "axios";
+import api from "../api/axios";
 import { Truck, CheckCircle, XCircle, Clock, MapPin, Package , User  } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -15,7 +15,7 @@ const Orderlivreur = () => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const response = await axios.get("/api/orders/assigned");
+        const response = await api.get("/orders/assigned");
         setOrders(response.data.orders || []);
       } catch (error) {
         console.error("Erreur lors de la récupération des commandes:", error);
@@ -30,7 +30,7 @@ const Orderlivreur = () => {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      await axios.put(`/api/orders/${orderId}/status`, {
+      await api.put(`/orders/${orderId}/status`, {
         status: newStatus,
         livreurId: user._id
       });

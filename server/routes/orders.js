@@ -274,3 +274,55 @@ router.get('/stats/overview', authenticate, requireRole(['admin', 'closeur', 'li
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
+
+// =====================
+// Mise à jour du statut d'une commande (livreur/admin/closeur)
+// =====================
+router.put('/:id/status', authenticate, requireRole(['admin', 'closeur', 'livreur']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'ID de commande invalide' });
+    }
+
+    const allowedStatuses = ['en_cours', 'livré', 'annulé', 'attribué'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Statut invalide' });
+    }
+
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({ error: 'Commande non trouvée' });
+    }
+
+    // Contrôle d'accès: un livreur ne peut mettre à jour que ses propres commandes
+    if (req.user.role === 'livreur' && order.livreurId?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    order.status = status;
+    if (status !== 'en_attente') {
+      order.dateAttribution = order.dateAttribution || new Date();
+      if (!order.livreurId && req.user.role === 'livreur') {
+        order.livreurId = req.user._id;
+      }
+    }
+    await order.save();
+
+    // Notifier via Socket.IO si disponible
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('orderUpdated', order.toObject());
+      if (status === 'livré') {
+        io.emit('order-delivered', { order: order.toObject() });
+      }
+    }
+
+    res.json({ message: 'Statut mis à jour', order });
+  } catch (error) {
+    console.error('Erreur mise à jour statut:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
