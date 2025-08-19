@@ -131,16 +131,16 @@ const Layout = () => {
             <div className="flex flex-1" />
             
             {/* Status indicators */}
-            <div className="flex items-center gap-x-4 lg:gap-x-6">
+            <div className="flex items-center gap-x-4 lg:gap-x-6 flex-wrap justify-end">
               {/* Connection status */}
               <div className="flex items-center gap-x-2">
                 {connected ? (
-                  <WifiOff className="h-4 w-4 text-danger-500" />
-                ) : (
                   <Wifi className="h-4 w-4 text-success-500" />
+                ) : (
+                  <WifiOff className="h-4 w-4 text-danger-500" />
                 )}
                 <span className="text-xs text-gray-500">
-                  {connected ? 'Déconnecté' : ' Connecté'}
+                  {connected ? 'Connecté' : 'Déconnecté'}
                 </span>
               </div>
 
@@ -154,10 +154,10 @@ const Layout = () => {
               <div className="relative">
                 <div className="flex items-center gap-x-3">
                   <div className="hidden md:flex md:flex-col md:items-end md:leading-tight">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-gray-900 truncate max-w-[160px]">
                       {user?.prenom} {user?.nom}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 truncate max-w-[200px]">
                       {getRoleLabel(user?.role)}
                       {user?.boutique && ` - ${user.boutique}`}
                     </p>
