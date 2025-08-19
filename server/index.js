@@ -24,7 +24,6 @@ const allowedOrigins = [
   process.env.CLIENT_URL,
   'https://frontend-nine-eta-99.vercel.app',
   'http://localhost:3000',
-  "https://backend-beta-blond-93.vercel.app"
 ].filter(Boolean);
 
 app.use(cors({
@@ -52,20 +51,20 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// Configuration des sessions
 app.use(session({
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({
     mongoUrl: process.env.MONGODB_URI,
-    ttl: 24 * 60 * 60 // 1 jour
+    ttl: 24 * 60 * 60
   }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000,
-    domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : 'localhost'
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
