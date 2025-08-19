@@ -92,6 +92,7 @@ router.post('/login', loginValidation, async (req, res) => {
     req.session.role = user.role;
 
     // Générer le token JWT
+    // Générer le token JWT
     const token = jwt.sign(
       { 
         userId: user._id, 
@@ -102,11 +103,11 @@ router.post('/login', loginValidation, async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRE || '24h' }
     );
 
-    // Envoyer la réponse
+    // Envoyer la réponse AVEC le token
     res.json({
       message: 'Connexion réussie',
       user: user.toPublicJSON(),
-      token,
+      token, // ← Assurez-vous que le token est inclus
       sessionId: req.sessionID
     });
 
