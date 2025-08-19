@@ -27,26 +27,9 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Autoriser les requêtes sans origine (clients non navigateurs)
-    if (!origin) return callback(null, true);
-
-    // Autoriser explicitement les origines configurées
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    // Autoriser les frontends Vercel (*.vercel.app)
-    try {
-      const hostname = new URL(origin).hostname;
-      if (hostname && hostname.endsWith('.vercel.app')) {
-        return callback(null, true);
-      }
-    } catch (e) {}
-
-    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-    return callback(new Error(msg), false);
-  },
+  // Reflète automatiquement l'origine de la requête (permet tous les origins). 
+  // Assurez-vous d'avoir défini CLIENT_URL en prod si vous souhaitez restreindre.
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   // Laisser cors refléter automatiquement les en-têtes demandés par le navigateur
@@ -55,6 +38,21 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+// Fallback: for any response path, ensure CORS headers are present
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Vary', 'Origin');
+  }
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
 // Répondre explicitement aux preflight OPTIONS
 app.options('*', cors(corsOptions));
 
