@@ -132,7 +132,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Validation simplifiée pour le premier admin
+    // Validation d'entrée
     const { nom, email, telephone, password } = req.body;
 
     if (!nom || !email || !telephone || !password) {
@@ -141,30 +141,31 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    if (password.length < 6) {
+    if (typeof password !== 'string' || password.length < 6) {
       return res.status(400).json({ 
         error: 'Le mot de passe doit contenir au moins 6 caractères' 
       });
     }
 
-    // Vérifier si l'utilisateur existe déjà
-    const existingUser = await User.findOne({
-      $or: [{ email }]
-    });
-
-    if (existingUser) {
-      return res.status(400).json({ 
-        error: 'Un utilisateur avec cet email existe déjà' 
-      });
+    // Générer un username valide et unique à partir de l'email
+    const emailLocal = String(email).split('@')[0] || 'user';
+    const sanitize = (v) => v.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 50) || 'user';
+    let baseUsername = sanitize(emailLocal);
+    let candidate = baseUsername;
+    let suffix = 0;
+    // Vérifier collisions sur email et username
+    while (await User.findOne({ $or: [{ email }, { username: candidate }] })) {
+      suffix += 1;
+      candidate = `${baseUsername}_${suffix}`.slice(0, 50);
     }
 
     // Créer le premier admin principal
     const newUser = new User({
-      username: email.split('@')[0], // Utiliser la partie locale de l'email comme username
+      username: candidate,
       email,
       password,
       nom,
-      prenom: nom.split(' ')[0] || nom, // Utiliser le premier mot du nom comme prénom
+      prenom: (String(nom).trim().split(' ')[0] || String(nom)).trim(),
       role: 'admin',
       telephone
     });
@@ -178,9 +179,19 @@ router.post('/register', async (req, res) => {
 
   } catch (error) {
     console.error('Erreur lors de l\'inscription:', error);
-    res.status(500).json({ 
-      error: 'Erreur interne du serveur' 
-    });
+    if (error && error.name === 'ValidationError') {
+      return res.status(400).json({
+        error: 'Données invalides',
+        details: Object.values(error.errors).map(e => e.message)
+      });
+    }
+    if (error && (error.code === 11000 || error.code === '11000')) {
+      const fields = Object.keys(error.keyPattern || {});
+      return res.status(400).json({
+        error: `Doublon sur les champs: ${fields.join(', ')}`
+      });
+    }
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 // // Supprimer cette section en double :
