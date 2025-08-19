@@ -172,6 +172,48 @@ router.put('/:id/status', authenticate, async (req, res) => {
     });
   }
 });
+// Route pour les statistiques
+router.get('/stats/overview', async (req, res) => {
+  try {
+    const stats = await Order.aggregate([
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          totalValue: { $sum: "$prix" }
+        }
+      },
+      {
+        $lookup: {
+          from: "orders",
+          pipeline: [
+            { $group: { _id: "$statut", count: { $sum: 1 } } }
+          ],
+          as: "statsByStatus"
+        }
+      }
+    ]);
+
+    res.json(stats[0] || { total: 0, totalValue: 0, statsByStatus: [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Route pour les commandes récentes
+router.get('/orders', async (req, res) => {
+  try {
+    const { limit = 5, sortBy = 'dateCommande', sortOrder = 'desc' } = req.query;
+    
+    const orders = await Order.find()
+      .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
+      .limit(parseInt(limit));
+
+    res.json({ orders });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Obtenir les commandes attribuées
 router.get('/assigned', authenticate, requireRole(['admin', 'closeur', 'livreur']), async (req, res) => {
