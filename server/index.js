@@ -24,7 +24,7 @@ const allowedOrigins = [
   process.env.CLIENT_URL,
   'https://frontend-nine-eta-99.vercel.app',
   'http://localhost:3000',
-  'https://backend-beta-blond-93.vercel.app'
+  "https://backend-beta-blond-93.vercel.app"
 ].filter(Boolean);
 
 app.use(cors({
@@ -32,7 +32,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['set-cookie']
+  optionsSuccessStatus: 200
 }));
 
 // Middleware de sécurité
@@ -52,9 +52,9 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Dans votre configuration de session (backend)
+// Configuration des sessions
 app.use(session({
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({
@@ -65,8 +65,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000,
-    domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : 'localhost'
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
@@ -120,10 +119,11 @@ app.use((req, res, next) => {
 });
 
 // Mode développement local
-// Dans votre backend
-if (process.env.VERCEL) {
-  // Configuration pour Vercel
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
   const server = http.createServer(app);
+  
+  // Configuration Socket.IO
   const io = socketIo(server, {
     cors: {
       origin: allowedOrigins,
@@ -131,20 +131,18 @@ if (process.env.VERCEL) {
       credentials: true
     }
   });
-  
-  module.exports = { app, server };
-} else {
-  // Configuration pour développement local
-  const PORT = process.env.PORT || 5000;
-  const server = app.listen(PORT, () => {
-    console.log(`Serveur sur http://localhost:${PORT}`);
+
+  io.on('connection', (socket) => {
+    console.log('Nouveau client connecté:', socket.id);
+    socket.on('disconnect', () => {
+      console.log('Client déconnecté:', socket.id);
+    });
   });
-  
-  const io = socketIo(server, {
-    cors: {
-      origin: "http://localhost:3000",
-      credentials: true
-    }
+
+  app.set('io', io);
+
+  server.listen(PORT, () => {
+    console.log(`Serveur en cours d'exécution sur http://localhost:${PORT}`);
   });
 }
 
