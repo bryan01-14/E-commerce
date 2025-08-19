@@ -3,36 +3,40 @@ const User = require('../models/User');
 
 
 
-// middleware/auth.js
 const authenticate = async (req, res, next) => {
   try {
-    // Vérifier d'abord la session
-    if (req.session && req.session.userId) {
-      const user = await User.findById(req.session.userId);
-      if (user && user.actif) {
-        req.user = user;
-        return next();
-      }
-    }
-
-    // Si pas de session, vérifier le token JWT
+    // Vérifier d'abord le token JWT dans les headers
     const authHeader = req.header('Authorization');
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       
       if (token) {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-        const user = await User.findById(decoded.userId);
-        
-        if (user && user.actif) {
-          req.user = user;
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+          const user = await User.findById(decoded.userId);
           
-          // Créer/mettre à jour la session pour les requêtes futures
-          req.session.userId = user._id;
-          req.session.role = user.role;
-          
-          return next();
+          if (user && user.actif) {
+            req.user = user;
+            
+            // Mettre à jour la session pour les requêtes futures
+            req.session.userId = user._id;
+            req.session.role = user.role;
+            
+            return next();
+          }
+        } catch (tokenError) {
+          // Token invalide ou expiré, on continue avec la session
+          console.log('Token invalide, vérification de la session...');
         }
+      }
+    }
+
+    // Vérifier la session si le token n'est pas valide ou absent
+    if (req.session && req.session.userId) {
+      const user = await User.findById(req.session.userId);
+      if (user && user.actif) {
+        req.user = user;
+        return next();
       }
     }
 
@@ -43,15 +47,6 @@ const authenticate = async (req, res, next) => {
 
   } catch (error) {
     console.error('Erreur d\'authentification:', error);
-    
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ error: 'Token invalide.' });
-    }
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expiré.' });
-    }
-    
     res.status(500).json({ error: 'Erreur d\'authentification.' });
   }
 };

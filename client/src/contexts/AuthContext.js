@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const API_URL = process.env.REACT_APP_API_URL || 'https://backend-beta-blond-93.vercel.app';
     axios.defaults.baseURL = API_URL;
-    axios.defaults.withCredentials = true;
+    axios.defaults.withCredentials = true; // Important pour les cookies de session
     
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -31,33 +31,46 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
-// contexts/AuthContext.js
-const checkAuth = async () => {
-  try {
-    const response = await axios.get('/api/auth/me');
-    
-    if (response.data.user) {
-      setUser(response.data.user);
-      if (response.data.token) {
-        const newToken = response.data.token;
-        setToken(newToken);
-        localStorage.setItem('token', newToken);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+  const checkAuth = async () => {
+    try {
+      // Vérifier d'abord avec le token
+      const response = await axios.get('/api/auth/me');
+      
+      if (response.data.user) {
+        setUser(response.data.user);
+        if (response.data.token) {
+          const newToken = response.data.token;
+          setToken(newToken);
+          localStorage.setItem('token', newToken);
+          axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+        }
       }
+    } catch (error) {
+      console.error('Erreur vérification auth:', error);
+      
+      // Si erreur 401, tenter une récupération de session
+      if (error.response?.status === 401) {
+        try {
+          const sessionResponse = await axios.get('/api/auth/session');
+          if (sessionResponse.data.userId) {
+            // Si session valide, relancer la vérification auth
+            await checkAuth();
+            return;
+          }
+        } catch (sessionError) {
+          console.error('Session invalide:', sessionError);
+        }
+        
+        // Nettoyer les données d'authentification invalides
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem('token');
+        delete axios.defaults.headers.common['Authorization'];
+      }
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Erreur vérification auth:', error);
-    if (error.response?.status === 401) {
-      // Nettoyer les données d'authentification invalides
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     checkAuth();
