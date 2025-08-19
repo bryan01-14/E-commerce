@@ -156,3 +156,121 @@ router.get('/assigned', authenticate, requireRole(['admin', 'closeur', 'livreur'
 });
 
 module.exports = router;
+
+// =====================
+// Routes attendues par le Dashboard
+// =====================
+
+// GET /api/orders - Liste paginée des commandes récentes
+router.get('/', authenticate, requireRole(['admin', 'closeur', 'livreur']), async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'dateCommande',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const limitNum = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+
+    // Filtrage selon rôle
+    const filter = {};
+    if (req.user.role === 'livreur') {
+      filter.livreurId = req.user._id;
+    } else if (req.user.role === 'closeur' && req.user.boutique) {
+      filter.boutique = req.user.boutique;
+    }
+
+    const sortOptions = { [sortBy]: sortDirection };
+
+    const docs = await Order.find(filter)
+      .sort(sortOptions)
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum)
+      .lean();
+
+    // Adapter le format attendu par le front (compatibilité)
+    const orders = docs.map((o) => {
+      const firstProduct = Array.isArray(o.produits) && o.produits.length > 0 ? o.produits[0] : null;
+      const statutMap = {
+        'livré': 'Livré',
+        'en_attente': 'En attente',
+        'attribué': 'Attribué',
+        'annulé': 'Non Livré'
+      };
+      return {
+        _id: o._id,
+        numeroCommande: o.numeroCommande,
+        nomClient: o.clientNom,
+        telephone: o.clientTelephone,
+        produit: firstProduct ? firstProduct.nom : '',
+        quantite: firstProduct ? firstProduct.quantite : 0,
+        prix: firstProduct ? firstProduct.prix : 0,
+        dateCommande: o.dateCommande,
+        statut: statutMap[o.status] || o.status,
+        boutique: o.boutique
+      };
+    });
+
+    const total = await Order.countDocuments(filter);
+
+    res.json({
+      orders,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error('Erreur liste commandes:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/orders/stats/overview - Statistiques pour le dashboard
+router.get('/stats/overview', authenticate, requireRole(['admin', 'closeur', 'livreur']), async (req, res) => {
+  try {
+    const match = {};
+    if (req.user.role === 'livreur') {
+      match.livreurId = req.user._id;
+    } else if (req.user.role === 'closeur' && req.user.boutique) {
+      match.boutique = req.user.boutique;
+    }
+
+    const [byStatus, totals] = await Promise.all([
+      Order.aggregate([
+        { $match: match },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]),
+      Order.aggregate([
+        { $match: match },
+        { $unwind: { path: '$produits', preserveNullAndEmptyArrays: true } },
+        { $group: { _id: null, total: { $sum: 1 }, totalValue: { $sum: { $multiply: [ { $ifNull: ['$produits.prix', 0] }, { $ifNull: ['$produits.quantite', 0] } ] } } } }
+      ])
+    ]);
+
+    const statutLabel = (s) => ({
+      'livré': 'Livré',
+      'en_attente': 'En attente',
+      'attribué': 'Attribué',
+      'annulé': 'Non Livré'
+    }[s] || s);
+
+    const statsByStatus = byStatus.map(s => ({ _id: statutLabel(s._id), count: s.count }));
+    const total = totals[0]?.total || 0;
+    const totalValue = totals[0]?.totalValue || 0;
+
+    res.json({
+      total,
+      totalValue,
+      statsByStatus
+    });
+  } catch (error) {
+    console.error('Erreur stats overview:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});

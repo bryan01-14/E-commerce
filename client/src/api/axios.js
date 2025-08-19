@@ -3,7 +3,8 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'https://backend-beta-blond-93.vercel.app/api',
   timeout: 10000,
-  withCredentials: true,
+  // Nous utilisons le JWT en Authorization, pas les cookies cross-site
+  withCredentials: false,
   headers: {
     'Accept': 'application/json',
     'Content-Type': 'application/json'

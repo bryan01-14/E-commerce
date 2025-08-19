@@ -19,9 +19,11 @@ export const SocketProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
 
   useEffect(() => {
-    if (isAuthenticated && user) {
+    const ENABLE_SOCKET = (process.env.REACT_APP_ENABLE_SOCKET === 'true') || (typeof window !== 'undefined' && window.location.hostname === 'localhost');
+    if (ENABLE_SOCKET && isAuthenticated && user) {
       // Créer la connexion socket
-      const newSocket = io('http://localhost:5000', {
+      const API_BASE = (process.env.REACT_APP_API_URL || 'https://backend-beta-blond-93.vercel.app/api').replace(/\/api$/, '');
+      const newSocket = io(API_BASE, {
         withCredentials: true,
         transports: ['websocket', 'polling'],
       });
@@ -96,7 +98,7 @@ export const SocketProvider = ({ children }) => {
         setConnected(false);
       }
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, socket]);
 
   // Fonction pour émettre des événements
   const emit = (event, data) => {
