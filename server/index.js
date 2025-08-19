@@ -26,7 +26,7 @@ const allowedOrigins = [
   'http://localhost:3000'
 ].filter(Boolean);
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     // Autoriser les requêtes sans origine (clients non navigateurs)
     if (!origin) return callback(null, true);
@@ -49,8 +49,14 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+  // Laisser cors refléter automatiquement les en-têtes demandés par le navigateur
+  // (ne pas fixer allowedHeaders pour éviter les échecs de preflight si l'en-tête ne figure pas dans la liste)
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+// Répondre explicitement aux preflight OPTIONS
+app.options('*', cors(corsOptions));
 
 // Middleware de sécurité
 app.use(helmet());
