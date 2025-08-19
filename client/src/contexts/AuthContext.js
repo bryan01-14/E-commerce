@@ -31,7 +31,7 @@ export const AuthProvider = ({ children }) => {
 // Dans votre AuthContext.js
 const checkAuth = async () => {
   try {
-    const response = await axios.get('/api/auth/me', {
+    const response = await axios.get('https://backend-beta-blond-93.vercel.app/api/auth/me', {
       withCredentials: true,
       baseURL: process.env.REACT_APP_API_URL
     });
