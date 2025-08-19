@@ -24,7 +24,6 @@ const allowedOrigins = [
   process.env.CLIENT_URL,
   'https://frontend-nine-eta-99.vercel.app',
   'http://localhost:3000',
-  "https://backend-beta-blond-93.vercel.app"
 ].filter(Boolean);
 
 app.use(cors({
