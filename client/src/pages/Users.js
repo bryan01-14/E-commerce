@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Users as UsersIcon,
@@ -39,7 +39,7 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('https://backend-beta-blond-93.vercel.app/api/users');
+      const response = await api.get('/users');
       setUsers(response.data.users || []);
     } catch (error) {
       toast.error('Erreur lors du chargement des utilisateurs');
@@ -95,8 +95,8 @@ const Users = () => {
     
     try {
       const url = modalType === 'edit' 
-        ? `http://localhost:5000/api/users/${selectedUser._id}`
-        : 'http://localhost:5000/api/users';
+        ? `/users/${selectedUser._id}`
+        : '/users';
       
       const method = modalType === 'edit' ? 'put' : 'post';
       
@@ -109,7 +109,7 @@ const Users = () => {
       console.log('Données envoyées à l\'API:', body);
       console.log('URL de l\'API:', url);
 
-      await axios[method](url, body);
+      await api[method](url, body);
 
       toast.success(
         modalType === 'edit' 
@@ -132,12 +132,12 @@ const Users = () => {
   const handleToggleStatus = async (userId, currentStatus) => {
     try {
       const endpoint = currentStatus 
-        ? `/api/users/${userId}`
-        : `/api/users/${userId}/reactivate`;
+        ? `/users/${userId}`
+        : `/users/${userId}/reactivate`;
       
       const method = currentStatus ? 'delete' : 'post';
 
-      await axios[method](endpoint);
+      await api[method](endpoint);
 
       toast.success(
         currentStatus 

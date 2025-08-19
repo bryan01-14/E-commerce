@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
-import axios from 'axios';
+import api from '../api/axios';
 import { toast } from 'react-hot-toast';
 import { 
   Package, 
@@ -33,7 +33,8 @@ const LivreurDashboard = () => {
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`https://backend-beta-blond-93.vercel.app/api/orders/livreur/${user._id}`);
+      // Utiliser l'endpoint existant côté serveur pour les commandes attribuées
+      const response = await api.get('/orders/assigned');
       const ordersData = response.data.orders || [];
       setOrders(ordersData);
       
@@ -56,7 +57,8 @@ const LivreurDashboard = () => {
   // Mettre à jour le statut d'une commande
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      await axios.put(`https://backend-beta-blond-93.vercel.app/api/orders/${orderId}/status`, {
+      // TODO: implémenter la route côté serveur si nécessaire
+      await api.put(`/orders/${orderId}/status`, {
         status: newStatus,
         livreurId: user._id
       });

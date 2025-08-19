@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { UserPlus, Eye, EyeOff, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios';
+import api from '../api/axios';
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -23,7 +23,7 @@ const Register = () => {
     setLoading(true);
     try {
       // Vérifier d'abord s'il existe déjà un admin principal
-      const checkResponse = await axios.get('https://backend-beta-blond-93.vercel.app/api/users/check-admin');
+      const checkResponse = await api.get('/users/check-admin');
       
       if (checkResponse.data.hasAdmin) {
         toast.error('Un administrateur principal existe déjà. L\'inscription est fermée.');
@@ -31,7 +31,7 @@ const Register = () => {
       }
 
       // Créer le premier admin principal
-      const response = await axios.post('https://backend-beta-blond-93.vercel.app/api/auth/register', {
+      const response = await api.post('/auth/register', {
         ...data,
         role: 'admin'
       });
