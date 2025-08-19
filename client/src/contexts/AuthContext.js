@@ -1,6 +1,6 @@
 // contexts/AuthContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
@@ -18,23 +18,19 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // Configuration axios
-  useEffect(() => {
-    const API_URL = process.env.REACT_APP_API_URL || 'https://backend-beta-blond-93.vercel.app';
-    axios.defaults.baseURL = API_URL;
-    axios.defaults.withCredentials = true; // Important pour les cookies de session
-    
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-      delete axios.defaults.headers.common['Authorization'];
-    }
-  }, [token]);
+  // L'instance API gère déjà baseURL, withCredentials et le token via intercepteur
 
   const checkAuth = async () => {
     try {
+      // Ne pas appeler l'API s'il n'y a pas de token (évite un 401 au chargement)
+      const existingToken = localStorage.getItem('token');
+      if (!existingToken) {
+        setUser(null);
+        return;
+      }
+
       // Vérifier d'abord avec le token
-      const response = await axios.get('/api/auth/me');
+      const response = await api.get('/auth/me');
       
       if (response.data.user) {
         setUser(response.data.user);
@@ -42,30 +38,32 @@ export const AuthProvider = ({ children }) => {
           const newToken = response.data.token;
           setToken(newToken);
           localStorage.setItem('token', newToken);
-          axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
         }
       }
     } catch (error) {
-      console.error('Erreur vérification auth:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Erreur vérification auth:', error);
+      }
       
       // Si erreur 401, tenter une récupération de session
       if (error.response?.status === 401) {
         try {
-          const sessionResponse = await axios.get('/api/auth/session');
+          const sessionResponse = await api.get('/auth/session');
           if (sessionResponse.data.userId) {
             // Si session valide, relancer la vérification auth
             await checkAuth();
             return;
           }
         } catch (sessionError) {
-          console.error('Session invalide:', sessionError);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('Session invalide:', sessionError);
+          }
         }
         
         // Nettoyer les données d'authentification invalides
         setUser(null);
         setToken(null);
         localStorage.removeItem('token');
-        delete axios.defaults.headers.common['Authorization'];
       }
     } finally {
       setLoading(false);
@@ -78,13 +76,12 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      const response = await axios.post('/api/auth/login', credentials);
+      const response = await api.post('/auth/login', credentials);
       const { user, token } = response.data;
       
       setUser(user);
       setToken(token);
       localStorage.setItem('token', token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       toast.success('Connexion réussie');
       return { success: true };
@@ -98,14 +95,13 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post('/api/auth/logout');
+      await api.post('/auth/logout');
     } catch (error) {
       console.error('Erreur lors de la déconnexion API:', error);
     } finally {
       setUser(null);
       setToken(null);
       localStorage.removeItem('token');
-      delete axios.defaults.headers.common['Authorization'];
       toast.success('Déconnexion réussie');
     }
   };
