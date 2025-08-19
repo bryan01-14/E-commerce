@@ -135,9 +135,9 @@ const Layout = () => {
               {/* Connection status */}
               <div className="flex items-center gap-x-2">
                 {connected ? (
-                  <Wifi className="h-4 w-4 text-danger-500" />
+                  <WifiOff className="h-4 w-4 text-danger-500" />
                 ) : (
-                  <WifiOff className="h-4 w-4 text-success-500" />
+                  <Wifi className="h-4 w-4 text-success-500" />
                 )}
                 <span className="text-xs text-gray-500">
                   {connected ? 'Déconnecté' : ' Connecté'}
