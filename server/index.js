@@ -107,6 +107,16 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Middleware anti-timeout
+app.use((req, res, next) => {
+  req.setTimeout(5000, () => {
+    if (!res.headersSent) {
+      res.status(504).json({ error: 'Timeout' });
+    }
+  });
+  next();
+});
+
 // Mode développement local
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
