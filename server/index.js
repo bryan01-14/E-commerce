@@ -22,21 +22,30 @@ app.set('trust proxy', 1);
 // Configuration CORS améliorée
 const allowedOrigins = [
   process.env.CLIENT_URL,
-  'https://frontend-nine-eta-99.vercel.app',
-  'http://localhost:3000',
-  'https://backend-beta-blond-93.vercel.app'
+  process.env.SECONDARY_CLIENT_URL,
+  'http://localhost:3000'
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl requests)
+    // Autoriser les requêtes sans origine (clients non navigateurs)
     if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+
+    // Autoriser explicitement les origines configurées
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
-    return callback(null, true);
+
+    // Autoriser les frontends Vercel (*.vercel.app)
+    try {
+      const hostname = new URL(origin).hostname;
+      if (hostname && hostname.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+    } catch (e) {}
+
+    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    return callback(new Error(msg), false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
