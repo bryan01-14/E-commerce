@@ -31,12 +31,17 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       try {
         if (token) {
-          const response = await axios.get('/api/auth/me');
+          const response = await axios.get('/auth/me', {
+            baseURL: process.env.REACT_APP_API_URL,
+            withCredentials: true
+          });
           setUser(response.data.user);
         }
       } catch (error) {
-        console.error('Erreur de vérification d\'authentification:', error);
-        logout();
+        console.error('Erreur auth:', error);
+        if (error.response?.status === 401) {
+          logout(); // Déconnecter seulement si 401
+        }
       } finally {
         setLoading(false);
       }

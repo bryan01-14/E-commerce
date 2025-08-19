@@ -10,6 +10,7 @@ import {
   SwissFranc
 } from 'lucide-react';
 import { format } from 'date-fns';
+import api from '../api/axios';
 import { fr } from 'date-fns/locale';
 
 const Dashboard = () => {
@@ -19,23 +20,24 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const fetchData = async () => {
       try {
-        const [statsResponse, ordersResponse] = await Promise.all([
-          axios.get('https://backend-beta-blond-93.vercel.app/api/orders/stats/overview'),
-          axios.get('https://backend-beta-blond-93.vercel.app/api/orders?limit=5&sortBy=dateCommande&sortOrder=desc')
+        const [stats, orders] = await Promise.all([
+          api.get('/orders/stats/overview'),
+          api.get('/orders', {
+            params: { limit: 5, sortBy: 'dateCommande', sortOrder: 'desc' }
+          })
         ]);
-
-        setStats(statsResponse.data);
-        setRecentOrders(ordersResponse.data.orders || []);
-      } catch (error) {
-        console.error('Erreur lors du chargement du dashboard:', error);
+        setStats(stats.data);
+        setRecentOrders(orders.data.orders || []);
+      } catch (err) {
+        console.error('Dashboard error:', err);
       } finally {
         setLoading(false);
       }
     };
-
-    fetchDashboardData();
+  
+    fetchData();
   }, []);
 
   const getStatusIcon = (status) => {

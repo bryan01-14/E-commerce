@@ -180,6 +180,32 @@ router.post('/register', async (req, res) => {
     });
   }
 });
+// Ajoutez cette route avant les autres routes
+app.get('/auth/me', async (req, res) => {
+  try {
+    // Vérifiez le token depuis les cookies ou headers
+    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+
+    // Décoder le token JWT (si vous utilisez JWT)
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Récupérer l'utilisateur depuis la DB
+    const user = await User.findById(decoded.userId).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    res.json({ user });
+  } catch (err) {
+    console.error('Erreur auth/me:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
 // Route d'inscription d'utilisateurs (réservée aux admins)
 router.post('/register-user', authenticate, requireAdmin, registerValidation, async (req, res) => {

@@ -1,27 +1,29 @@
-import axios from 'axios';
-
 const api = axios.create({
-  baseURL: 'https://backend-beta-blond-93.vercel.app/api',
-  timeout: 8000,
-  withCredentials: true , // 8 secondes
+  baseURL: process.env.REACT_APP_API_URL || 'https://backend-beta-blond-93.vercel.app/api',
+  timeout: 10000,
+  withCredentials: true,
   headers: {
-    'Cache-Control': 'no-cache',
-    'Content-Type': 'application/json',
-     'X-Requested-With': 'XMLHttpRequest'
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
   }
 });
 
-// Intercepteur pour erreurs spécifiques
+// Intercepteur pour ajouter le token
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Gestion des erreurs
 api.interceptors.response.use(
   response => response,
   error => {
-    if (error.code === 'ECONNABORTED') {
-      return Promise.reject({ 
-        message: "La requête a pris trop de temps" 
-      });
+    if (error.response?.status === 401) {
+      window.location = '/login'; // Rediriger si non autorisé
     }
     return Promise.reject(error);
   }
 );
-
-export default api;
