@@ -181,7 +181,7 @@ router.post('/register', async (req, res) => {
   }
 });
 // Ajoutez cette route avant les autres routes
-app.get('/auth/me', async (req, res) => {
+router.get('/auth/me', async (req, res) => {
   try {
     // Vérifiez le token depuis les cookies ou headers
     const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
