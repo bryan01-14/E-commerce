@@ -31,29 +31,33 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
-  // Vérifier l'authentification
-  const checkAuth = async () => {
-    try {
-      const response = await axios.get('/api/auth/me');
-      
-      if (response.data.user) {
-        setUser(response.data.user);
-        if (response.data.token) {
-          const newToken = response.data.token;
-          setToken(newToken);
-          localStorage.setItem('token', newToken);
-          axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-        }
+// contexts/AuthContext.js
+const checkAuth = async () => {
+  try {
+    const response = await axios.get('/api/auth/me');
+    
+    if (response.data.user) {
+      setUser(response.data.user);
+      if (response.data.token) {
+        const newToken = response.data.token;
+        setToken(newToken);
+        localStorage.setItem('token', newToken);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       }
-    } catch (error) {
-      console.error('Erreur vérification auth:', error);
-      if (error.response?.status === 401) {
-        logout();
-      }
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Erreur vérification auth:', error);
+    if (error.response?.status === 401) {
+      // Nettoyer les données d'authentification invalides
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('token');
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     checkAuth();

@@ -3,6 +3,7 @@ const User = require('../models/User');
 
 
 
+// middleware/auth.js
 const authenticate = async (req, res, next) => {
   try {
     // Vérifier d'abord la session
@@ -16,54 +17,42 @@ const authenticate = async (req, res, next) => {
 
     // Si pas de session, vérifier le token JWT
     const authHeader = req.header('Authorization');
-    if (!authHeader) {
-      return res.status(401).json({ 
-        error: 'Accès refusé. Token ou session manquant.' 
-      });
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      
+      if (token) {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const user = await User.findById(decoded.userId);
+        
+        if (user && user.actif) {
+          req.user = user;
+          
+          // Créer/mettre à jour la session pour les requêtes futures
+          req.session.userId = user._id;
+          req.session.role = user.role;
+          
+          return next();
+        }
+      }
     }
 
-    let token;
-    if (authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    } else {
-      token = authHeader;
-    }
+    // Si aucune méthode d'authentification n'a fonctionné
+    return res.status(401).json({ 
+      error: 'Accès refusé. Token ou session manquant.' 
+    });
 
-    if (!token) {
-      return res.status(401).json({ 
-        error: 'Token manquant.' 
-      });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    const user = await User.findById(decoded.userId);
-    
-    if (!user || !user.actif) {
-      return res.status(401).json({ 
-        error: 'Token invalide ou utilisateur inactif.' 
-      });
-    }
-
-    req.user = user;
-    next();
   } catch (error) {
     console.error('Erreur d\'authentification:', error);
     
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ 
-        error: 'Token invalide.' 
-      });
+      return res.status(401).json({ error: 'Token invalide.' });
     }
     
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
-        error: 'Token expiré.' 
-      });
+      return res.status(401).json({ error: 'Token expiré.' });
     }
     
-    res.status(500).json({ 
-      error: 'Erreur d\'authentification.' 
-    });
+    res.status(500).json({ error: 'Erreur d\'authentification.' });
   }
 };
 
