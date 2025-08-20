@@ -211,7 +211,7 @@ const Users = () => {
       </div>
 
       <div className="card">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -272,7 +272,7 @@ const Users = () => {
                     {getStatusBadge(user.actif)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
                       {user._id !== currentUser._id && currentUser.role === 'admin' && (
                         <>
                           <button

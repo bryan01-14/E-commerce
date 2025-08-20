@@ -93,7 +93,7 @@ const Orderlivreur = () => {
           <p className="text-gray-600">Aucune commande à livrer pour le moment</p>
         </div>
       ) : (
-        <div className="grid gap-6">
+        <div className="grid gap-4 sm:gap-6">
           {orders.map((order) => (
             <div key={order._id} className="bg-white rounded-lg shadow p-6">
               <div className="flex justify-between items-start mb-4">
@@ -110,7 +110,7 @@ const Orderlivreur = () => {
                 </span>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
                 <div>
                   <h3 className="font-medium mb-2 flex items-center">
                     <User className="h-4 w-4 mr-2" />
@@ -147,7 +147,7 @@ const Orderlivreur = () => {
               </div>
 
               {order.status === "attribué" && (
-                <div className="flex space-x-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:space-x-4">
                   <button
                     onClick={() => updateOrderStatus(order._id, "livré")}
                     className="flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"

@@ -146,7 +146,7 @@ const LivreurDashboard = () => {
         </div>
 
         {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -232,7 +232,7 @@ const LivreurDashboard = () => {
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <h4 className="font-medium text-gray-900 mb-2">Informations client</h4>
                           <div className="space-y-2">
@@ -272,7 +272,7 @@ const LivreurDashboard = () => {
                     </div>
 
                     {/* Actions */}
-                    <div className="ml-6 flex flex-col space-y-2">
+                    <div className="mt-4 sm:ml-6 sm:mt-0 flex flex-col space-y-2">
                       {order.status === 'en_cours' && (
                         <>
                           <button
