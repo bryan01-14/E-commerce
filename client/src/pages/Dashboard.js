@@ -304,16 +304,16 @@ const Dashboard = () => {
               Actions rapides
             </h3>
             <div className="space-y-3">
-              <button className="w-full btn-primary">
-                <a href="/orders">Voir toutes les commandes</a>
+              <button className="w-full btn-primary" onClick={() => navigate('/orders')}>
+                Voir toutes les commandes
               </button>
               {user?.role === 'admin' && (
-                <button className="w-full btn-secondary">
-                  <a href="/users">Gérer les utilisateurs</a>
+                <button className="w-full btn-secondary" onClick={() => navigate('/users')}>
+                  Gérer les utilisateurs
                 </button>
               )}
-              <button className="w-full btn-secondary">
-                <a href="/settings">Paramètres</a>
+              <button className="w-full btn-secondary" onClick={() => navigate('/settings')}>
+                Paramètres
               </button>
             </div>
           </div>

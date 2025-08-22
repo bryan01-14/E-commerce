@@ -13,6 +13,7 @@ const authRoutes = require('./routes/auth');
 const orderRoutes = require('./routes/orders');
 const userRoutes = require('./routes/users');
 const googleSheetsRoutes = require('./routes/googleSheets');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -98,6 +99,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/google-sheets', googleSheetsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Route de test
 app.get('/api/health', (req, res) => {

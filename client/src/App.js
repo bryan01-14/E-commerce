@@ -12,6 +12,7 @@ import Users from './pages/Users';
 import Settings from './pages/Settings';
 import GoogleSheetsTest from './pages/GoogleSheetsTest';
 import GoogleSheetsConfig from './pages/GoogleSheetsConfig';
+import AdminActivity from './pages/AdminActivity';
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
 
@@ -53,6 +54,7 @@ const AppContent = () => {
         <Route path="settings" element={<Settings />} />
         <Route path="google-sheets" element={<GoogleSheetsTest />} />
         <Route path="google-sheets-config" element={<GoogleSheetsConfig />} />
+        <Route path="admin-activity" element={<AdminActivity />} />
       </Route>
     </Routes>
   );

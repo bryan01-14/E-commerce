@@ -14,7 +14,8 @@ import {
   User,
   Wifi,
   WifiOff,
-  Database
+  Database,
+  Activity
 } from 'lucide-react';
 
 const Layout = () => {
@@ -34,6 +35,7 @@ const Layout = () => {
     ...(user?.role === 'livreur' ? [{ name: 'commande', href: '/orderlivreur', icon: Users }] : []),
     ...(user?.role === 'admin' || user?.role === 'closeur'  ? [{ name: 'Attribuer Commandes', href: '/orders', icon: Package }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Utilisateurs', href: '/users', icon: Users }] : []),
+    ...(user?.role === 'admin' ? [{ name: 'Surveillance Activités', href: '/admin-activity', icon: Activity }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Total des commandes', href: '/google-sheets', icon: Database }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Config Google Sheets', href: '/google-sheets-config', icon: Settings }] : []),
     { name: 'Paramètres', href: '/settings', icon: Settings },
