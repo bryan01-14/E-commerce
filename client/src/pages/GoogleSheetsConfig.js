@@ -50,6 +50,10 @@ const GoogleSheetsConfig = () => {
       
       if (currentRes.data.success) {
         setCurrentConfig(currentRes.data.config);
+        console.log('Configuration active mise à jour:', currentRes.data.config?.name);
+      } else {
+        setCurrentConfig(null);
+        console.log('Aucune configuration active trouvée');
       }
     } catch (error) {
       console.error('Erreur récupération configurations:', error);
@@ -157,7 +161,25 @@ const GoogleSheetsConfig = () => {
           );
         }
         
-        fetchConfigs();
+        // Mettre à jour immédiatement la configuration active
+        if (response.data.config) {
+          setCurrentConfig(response.data.config);
+        }
+        
+        // Mettre à jour la liste des configurations
+        await fetchConfigs();
+        
+        // Forcer une mise à jour de la configuration active après un délai
+        setTimeout(async () => {
+          try {
+            const currentRes = await api.get('/google-sheets/config/current');
+            if (currentRes.data.success) {
+              setCurrentConfig(currentRes.data.config);
+            }
+          } catch (error) {
+            console.error('Erreur mise à jour configuration active:', error);
+          }
+        }, 1000);
       }
     } catch (error) {
       console.error('Erreur activation configuration:', error);
@@ -312,6 +334,14 @@ const GoogleSheetsConfig = () => {
                 Synchroniser
               </button>
               <button
+                onClick={fetchConfigs}
+                disabled={loading}
+                className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Actualiser
+              </button>
+              <button
                 onClick={() => setShowForm(true)}
                 className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
@@ -333,15 +363,16 @@ const GoogleSheetsConfig = () => {
         )}
 
         {/* Configuration actuelle */}
-        {currentConfig && (
-          <div className="bg-white rounded-lg shadow mb-6 sm:mb-8 p-4 sm:p-6">
+        {currentConfig ? (
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-lg shadow mb-6 sm:mb-8 p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
               <h2 className="text-lg font-medium text-gray-900 flex items-center">
                 <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
                 Configuration active
               </h2>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 self-start sm:self-auto">
-                Active
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 self-start sm:self-auto border border-green-300">
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Actuellement Active
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -374,6 +405,20 @@ const GoogleSheetsConfig = () => {
                 <p className="text-sm text-gray-900">{currentConfig.description}</p>
               </div>
             )}
+          </div>
+        ) : (
+          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg shadow mb-6 sm:mb-8 p-4 sm:p-6">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-yellow-500 mr-3" />
+              <div>
+                <h2 className="text-lg font-medium text-yellow-900">
+                  Aucune configuration active
+                </h2>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Activez une configuration pour commencer à synchroniser vos données Google Sheets.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -545,8 +590,9 @@ const GoogleSheetsConfig = () => {
                         <h3 className="text-lg font-medium text-gray-900 truncate">
                           {config.name}
                         </h3>
-                        {config.isActive && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 self-start sm:self-auto">
+                        {(config.isActive || (currentConfig && currentConfig._id === config._id)) && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 self-start sm:self-auto border border-green-300">
+                            <CheckCircle className="h-3 w-3 mr-1" />
                             Active
                           </span>
                         )}
@@ -591,7 +637,7 @@ const GoogleSheetsConfig = () => {
                     </div>
                     
                     <div className="flex flex-col sm:flex-row gap-2 lg:flex-col lg:gap-2">
-                      {!config.isActive && (
+                      {!(config.isActive || (currentConfig && currentConfig._id === config._id)) && (
                         <button
                           onClick={() => handleActivate(config._id)}
                           disabled={loading}
@@ -611,7 +657,7 @@ const GoogleSheetsConfig = () => {
                         Modifier
                       </button>
                       
-                      {!config.isActive && (
+                      {!(config.isActive || (currentConfig && currentConfig._id === config._id)) && (
                         <button
                           onClick={() => handleDelete(config._id)}
                           disabled={loading}
