@@ -9,7 +9,9 @@
     "migrate:google-sheets": "node migrations/initGoogleSheetsConfig.js",
     "test:google-sheets": "node test-google-sheets-config.js",
     "test:sync": "node test-sync.js",
-    "diagnose:sync": "node diagnose-sync.js"
+    "diagnose:sync": "node diagnose-sync.js",
+    "fix:sync": "node fix-sync-error.js",
+    "auto:fix:sync": "node auto-fix-sync.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

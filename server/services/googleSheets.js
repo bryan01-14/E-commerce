@@ -8,20 +8,54 @@ class GoogleSheetsService {
     this.sheets = null;
     this.currentConfig = null;
     this.isInitialized = false;
+    this.initializationPromise = null; // Pour éviter les initialisations multiples
   }
 
   async initialize() {
     try {
       // Éviter la double initialisation
       if (this.isInitialized && this.sheets) {
+        console.log('✅ Service déjà initialisé');
         return { success: true };
       }
 
-      // Vérification des variables d'environnement
-      if (!process.env.GOOGLE_SHEETS_PRIVATE_KEY) {
-        throw new Error('GOOGLE_SHEETS_PRIVATE_KEY manquant dans .env');
+      // Si une initialisation est en cours, attendre
+      if (this.initializationPromise) {
+        console.log('⏳ Initialisation en cours, attente...');
+        return await this.initializationPromise;
       }
 
+      // Créer une nouvelle promesse d'initialisation
+      this.initializationPromise = this._performInitialization();
+      const result = await this.initializationPromise;
+      this.initializationPromise = null;
+      return result;
+
+    } catch (error) {
+      this.initializationPromise = null;
+      console.error('❌ Erreur lors de l\'initialisation:', error);
+      this.isInitialized = false;
+      throw error;
+    }
+  }
+
+  async _performInitialization() {
+    try {
+      console.log('🔄 Initialisation du service Google Sheets...');
+
+      // Vérification des variables d'environnement
+      const requiredVars = [
+        'GOOGLE_SHEETS_PRIVATE_KEY',
+        'GOOGLE_SHEETS_CLIENT_EMAIL',
+        'GOOGLE_SHEETS_PROJECT_ID'
+      ];
+
+      const missingVars = requiredVars.filter(varName => !process.env[varName]);
+      if (missingVars.length > 0) {
+        throw new Error(`Variables d'environnement manquantes: ${missingVars.join(', ')}`);
+      }
+
+      // Création de l'authentification
       this.auth = new google.auth.GoogleAuth({
         credentials: {
           type: 'service_account',
@@ -42,12 +76,14 @@ class GoogleSheetsService {
       this.sheets = google.sheets({ version: 'v4', auth: authClient });
       this.isInitialized = true;
 
+      console.log('✅ Service Google Sheets initialisé avec succès');
+
       // Charger la configuration active par défaut
       await this.loadActiveConfig();
       
       return { success: true };
     } catch (error) {
-      console.error('Erreur initialisation Google Sheets:', error);
+      console.error('❌ Erreur lors de l\'initialisation:', error);
       this.isInitialized = false;
       throw error;
     }
@@ -58,7 +94,12 @@ class GoogleSheetsService {
       console.log('📋 Chargement de la configuration active...');
       
       // Essayer de charger la configuration active depuis la base de données
-      const activeConfig = await GoogleSheetsConfig.findOne({ isActive: true });
+      let activeConfig = null;
+      try {
+        activeConfig = await GoogleSheetsConfig.findOne({ isActive: true });
+      } catch (dbError) {
+        console.log('⚠️ Erreur base de données, utilisation du fallback:', dbError.message);
+      }
       
       if (activeConfig) {
         this.currentConfig = activeConfig;
@@ -96,6 +137,8 @@ class GoogleSheetsService {
 
   async setActiveConfig(configId) {
     try {
+      console.log(`🔄 Changement de configuration active vers: ${configId}`);
+      
       // Désactiver toutes les configurations
       await GoogleSheetsConfig.updateMany({}, { isActive: false });
       
@@ -114,14 +157,20 @@ class GoogleSheetsService {
       }
       
       this.currentConfig = config;
-      console.log(`Configuration active changée vers: ${config.name}`);
+      console.log(`✅ Configuration active changée vers: ${config.name}`);
       
       // Synchroniser automatiquement les commandes de la nouvelle feuille
-      await this.syncOrdersFromNewSheet(config);
+      try {
+        const syncResult = await this.syncOrdersFromNewSheet(config);
+        console.log('✅ Synchronisation automatique terminée:', syncResult);
+        return { success: true, config, syncResult };
+      } catch (syncError) {
+        console.error('⚠️ Erreur lors de la synchronisation automatique:', syncError.message);
+        return { success: true, config, syncError: syncError.message };
+      }
       
-      return { success: true, config };
     } catch (error) {
-      console.error('Erreur lors du changement de configuration:', error);
+      console.error('❌ Erreur lors du changement de configuration:', error);
       throw error;
     }
   }
@@ -130,17 +179,27 @@ class GoogleSheetsService {
     try {
       console.log(`🔄 Synchronisation des commandes depuis la nouvelle feuille: ${config.sheetName}`);
       
+      // Vérifier que la configuration est valide
+      if (!config.spreadsheetId || !config.sheetName) {
+        throw new Error('Configuration invalide: spreadsheetId ou sheetName manquant');
+      }
+      
       // Récupérer les données de la nouvelle feuille
       const sheetData = await this.getData(config.spreadsheetId, config.sheetName);
       
       if (!sheetData || sheetData.length < 2) {
         console.log('⚠️ Aucune donnée trouvée dans la nouvelle feuille');
-        return { success: false, message: 'Aucune donnée trouvée' };
+        return { success: false, message: 'Aucune donnée trouvée', created: 0, updated: 0, total: 0 };
       }
 
       // Transformer les données en commandes
       const [headers, ...rows] = sheetData;
       const orders = this.transformSheetDataToOrders(rows, headers, config);
+      
+      if (orders.length === 0) {
+        console.log('⚠️ Aucune commande valide trouvée dans les données');
+        return { success: false, message: 'Aucune commande valide', created: 0, updated: 0, total: 0 };
+      }
       
       // Synchroniser avec la base de données
       const syncResults = await this.syncOrdersToDatabase(orders, config);
@@ -161,112 +220,148 @@ class GoogleSheetsService {
   }
 
   transformSheetDataToOrders(rows, headers, config) {
-    return rows.map((row, index) => {
-      const orderData = {};
+    try {
+      console.log(`🔄 Transformation de ${rows.length} lignes avec ${headers.length} colonnes`);
       
-      headers.forEach((header, colIndex) => {
-        const value = row[colIndex] || '';
+      return rows.map((row, index) => {
+        const orderData = {};
         
-        // Mapping des colonnes selon votre structure
-        switch (header.toLowerCase()) {
-          case 'n° commande':
-          case 'numero commande':
-          case 'id':
-            orderData.numeroCommande = value;
-            break;
-          case 'date':
-          case 'date commande':
-            orderData.dateCommande = new Date(value);
-            break;
-          case 'client':
-          case 'nom client':
-            orderData.clientNom = value;
-            break;
-          case 'téléphone':
-          case 'telephone':
-            orderData.clientTelephone = value;
-            break;
-          case 'adresse':
-          case 'adresse livraison':
-            orderData.adresseLivraison = value;
-            break;
-          case 'produit':
-            orderData.produits = [{ nom: value, quantite: 1, prix: 0 }];
-            break;
-          case 'quantité':
-          case 'qte':
-            if (orderData.produits && orderData.produits[0]) {
-              orderData.produits[0].quantite = parseInt(value) || 1;
-            }
-            break;
-          case 'prix':
-            if (orderData.produits && orderData.produits[0]) {
-              orderData.produits[0].prix = parseFloat(value) || 0;
-            }
-            break;
-          case 'boutique':
-            orderData.boutique = value;
-            break;
-          case 'statut':
-            orderData.status = value.toLowerCase() === 'en attente' ? 'en_attente' : 'en_attente';
-            break;
-        }
-      });
+        headers.forEach((header, colIndex) => {
+          const value = row[colIndex] || '';
+          
+          // Mapping des colonnes selon votre structure
+          switch (header.toLowerCase()) {
+            case 'n° commande':
+            case 'numero commande':
+            case 'id':
+            case 'commande':
+              orderData.numeroCommande = value;
+              break;
+            case 'date':
+            case 'date commande':
+            case 'date_commande':
+              try {
+                orderData.dateCommande = new Date(value);
+              } catch (dateError) {
+                orderData.dateCommande = new Date();
+              }
+              break;
+            case 'client':
+            case 'nom client':
+            case 'client_nom':
+              orderData.clientNom = value;
+              break;
+            case 'téléphone':
+            case 'telephone':
+            case 'client_telephone':
+              orderData.clientTelephone = value;
+              break;
+            case 'adresse':
+            case 'adresse livraison':
+            case 'adresse_livraison':
+              orderData.adresseLivraison = value;
+              break;
+            case 'produit':
+            case 'produits':
+              orderData.produits = [{ nom: value, quantite: 1, prix: 0 }];
+              break;
+            case 'quantité':
+            case 'qte':
+            case 'quantite':
+              if (orderData.produits && orderData.produits[0]) {
+                orderData.produits[0].quantite = parseInt(value) || 1;
+              }
+              break;
+            case 'prix':
+              if (orderData.produits && orderData.produits[0]) {
+                orderData.produits[0].prix = parseFloat(value) || 0;
+              }
+              break;
+            case 'boutique':
+              orderData.boutique = value;
+              break;
+            case 'statut':
+            case 'status':
+              orderData.status = value.toLowerCase() === 'en attente' ? 'en_attente' : 'en_attente';
+              break;
+          }
+        });
 
-      // Ajouter des valeurs par défaut
-      orderData.googleSheetsId = `${config.spreadsheetId}_${config.sheetName}_${index}`;
-      orderData.status = orderData.status || 'en_attente';
-      orderData.boutique = orderData.boutique || 'Boutique principale';
+        // Ajouter des valeurs par défaut
+        orderData.googleSheetsId = `${config.spreadsheetId}_${config.sheetName}_${index}`;
+        orderData.status = orderData.status || 'en_attente';
+        orderData.boutique = orderData.boutique || 'Boutique principale';
+        orderData.dateCommande = orderData.dateCommande || new Date();
+        
+        return orderData;
+      }).filter(order => order.numeroCommande && order.clientNom); // Filtrer les lignes valides
       
-      return orderData;
-    }).filter(order => order.numeroCommande && order.clientNom); // Filtrer les lignes valides
+    } catch (error) {
+      console.error('❌ Erreur lors de la transformation des données:', error);
+      return [];
+    }
   }
 
   async syncOrdersToDatabase(orders, config) {
     let created = 0;
     let updated = 0;
 
-    for (const orderData of orders) {
-      try {
-        // Vérifier si la commande existe déjà
-        const existingOrder = await Order.findOne({
-          $or: [
-            { numeroCommande: orderData.numeroCommande },
-            { googleSheetsId: orderData.googleSheetsId }
-          ]
-        });
-
-        if (existingOrder) {
-          // Mettre à jour la commande existante
-          await Order.findByIdAndUpdate(existingOrder._id, {
-            ...orderData,
-            updatedAt: new Date()
+    try {
+      console.log(`🔄 Synchronisation de ${orders.length} commandes avec la base de données...`);
+      
+      for (const orderData of orders) {
+        try {
+          // Vérifier si la commande existe déjà
+          const existingOrder = await Order.findOne({
+            $or: [
+              { numeroCommande: orderData.numeroCommande },
+              { googleSheetsId: orderData.googleSheetsId }
+            ]
           });
-          updated++;
-        } else {
-          // Créer une nouvelle commande
-          await Order.create(orderData);
-          created++;
-        }
-      } catch (error) {
-        console.error(`Erreur lors de la synchronisation de la commande ${orderData.numeroCommande}:`, error);
-      }
-    }
 
-    return { created, updated };
+          if (existingOrder) {
+            // Mettre à jour la commande existante
+            await Order.findByIdAndUpdate(existingOrder._id, {
+              ...orderData,
+              updatedAt: new Date()
+            });
+            updated++;
+          } else {
+            // Créer une nouvelle commande
+            await Order.create(orderData);
+            created++;
+          }
+        } catch (error) {
+          console.error(`⚠️ Erreur lors de la synchronisation de la commande ${orderData.numeroCommande}:`, error.message);
+        }
+      }
+
+      console.log(`✅ Synchronisation terminée: ${created} créées, ${updated} mises à jour`);
+      return { created, updated };
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation avec la base de données:', error);
+      throw error;
+    }
   }
 
   async getCurrentConfig() {
-    if (!this.currentConfig) {
-      await this.loadActiveConfig();
+    try {
+      if (!this.currentConfig) {
+        await this.loadActiveConfig();
+      }
+      return this.currentConfig;
+    } catch (error) {
+      console.error('❌ Erreur lors de la récupération de la configuration:', error);
+      throw error;
     }
-    return this.currentConfig;
   }
 
   async testAccess(spreadsheetId = null, sheetName = null) {
     try {
       // S'assurer que le service est initialisé
       if (!this.isInitialized || !this.sheets) {
+        console.log('⚠️ Service non initialisé, initialisation en cours...');
         await this.initialize();
       }
 
@@ -277,6 +372,8 @@ class GoogleSheetsService {
         throw new Error('Aucun ID de spreadsheet spécifié');
       }
 
+      console.log(`🔍 Test d'accès au spreadsheet: ${testSpreadsheetId}`);
+
       const response = await this.sheets.spreadsheets.get({
         spreadsheetId: testSpreadsheetId,
         fields: 'properties.title,sheets.properties'
@@ -284,6 +381,9 @@ class GoogleSheetsService {
       
       const availableSheets = response.data.sheets.map(s => s.properties.title);
       const sheetExists = testSheetName ? availableSheets.includes(testSheetName) : true;
+      
+      console.log(`✅ Accès réussi au spreadsheet: ${response.data.properties.title}`);
+      console.log(`   Feuilles disponibles: ${availableSheets.join(', ')}`);
       
       return {
         success: true,
@@ -293,7 +393,7 @@ class GoogleSheetsService {
         currentSheet: testSheetName
       };
     } catch (error) {
-      console.error('Erreur vérification accès:', error.message);
+      console.error('❌ Erreur vérification accès:', error.message);
       throw new Error(`Accès refusé au Google Sheet. Vérifiez: 
         1. L'ID du spreadsheet
         2. Le compte de service a bien accès
@@ -305,6 +405,7 @@ class GoogleSheetsService {
     try {
       // S'assurer que le service est initialisé
       if (!this.isInitialized || !this.sheets) {
+        console.log('⚠️ Service non initialisé, initialisation en cours...');
         await this.initialize();
       }
 
@@ -313,16 +414,19 @@ class GoogleSheetsService {
       const targetSheetName = sheetName || config.sheetName;
       
       const range = `${targetSheetName}!A:Z`;
-      console.log(`Tentative de lecture: ${range} depuis ${targetSpreadsheetId}`);
+      console.log(`📖 Lecture des données: ${range} depuis ${targetSpreadsheetId}`);
 
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: targetSpreadsheetId,
         range: range,
       });
 
-      return response.data.values || [];
+      const data = response.data.values || [];
+      console.log(`✅ ${data.length} lignes récupérées`);
+      
+      return data;
     } catch (error) {
-      console.error('Erreur récupération données:', {
+      console.error('❌ Erreur récupération données:', {
         message: error.message,
         code: error.code,
         errors: error.errors
@@ -335,7 +439,7 @@ class GoogleSheetsService {
     try {
       return await GoogleSheetsConfig.find().sort({ createdAt: -1 });
     } catch (error) {
-      console.error('Erreur lors de la récupération des configurations:', error);
+      console.error('❌ Erreur lors de la récupération des configurations:', error);
       throw error;
     }
   }
@@ -348,10 +452,10 @@ class GoogleSheetsService {
       const config = new GoogleSheetsConfig(configData);
       await config.save();
       
-      console.log(`Nouvelle configuration créée: ${config.name}`);
+      console.log(`✅ Nouvelle configuration créée: ${config.name}`);
       return config;
     } catch (error) {
-      console.error('Erreur lors de la création de la configuration:', error);
+      console.error('❌ Erreur lors de la création de la configuration:', error);
       throw error;
     }
   }
@@ -376,10 +480,10 @@ class GoogleSheetsService {
         throw new Error('Configuration non trouvée');
       }
       
-      console.log(`Configuration mise à jour: ${config.name}`);
+      console.log(`✅ Configuration mise à jour: ${config.name}`);
       return config;
     } catch (error) {
-      console.error('Erreur lors de la mise à jour de la configuration:', error);
+      console.error('❌ Erreur lors de la mise à jour de la configuration:', error);
       throw error;
     }
   }
@@ -396,11 +500,11 @@ class GoogleSheetsService {
       }
       
       await GoogleSheetsConfig.findByIdAndDelete(configId);
-      console.log(`Configuration supprimée: ${config.name}`);
+      console.log(`✅ Configuration supprimée: ${config.name}`);
       
       return { success: true };
     } catch (error) {
-      console.error('Erreur lors de la suppression de la configuration:', error);
+      console.error('❌ Erreur lors de la suppression de la configuration:', error);
       throw error;
     }
   }
