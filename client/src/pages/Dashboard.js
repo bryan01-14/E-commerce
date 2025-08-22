@@ -242,7 +242,7 @@ const Dashboard = () => {
                       <td className="hidden lg:table-cell px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {order.prix.toLocaleString('fr-FR', {
                           style: 'currency',
-                          currency: 'EUR'
+                          currency: 'XOF'
                         })}
                       </td>
                     </tr>
