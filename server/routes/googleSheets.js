@@ -163,7 +163,8 @@ router.post('/config/:id/activate', authenticate, requireRole(['admin']), async 
     res.json({
       success: true,
       message: "Configuration activée avec succès",
-      config: result.config
+      config: result.config,
+      syncResult: result.syncResult || null
     });
   } catch (error) {
     console.error("Erreur activation configuration:", error);
@@ -194,6 +195,25 @@ router.post('/config/test', authenticate, requireRole(['admin']), async (req, re
     });
   } catch (error) {
     console.error("Erreur test accès:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Route POST pour forcer la synchronisation des commandes
+router.post('/sync-orders', authenticate, requireRole(['admin']), async (req, res) => {
+  try {
+    const syncResult = await sheetsService.forceSyncOrders();
+    
+    res.json({
+      success: true,
+      message: "Synchronisation des commandes terminée",
+      syncResult
+    });
+  } catch (error) {
+    console.error("Erreur synchronisation commandes:", error);
     res.status(500).json({
       success: false,
       error: error.message

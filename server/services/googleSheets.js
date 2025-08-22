@@ -1,15 +1,22 @@
 const { google } = require('googleapis');
 const GoogleSheetsConfig = require('../models/GoogleSheetsConfig');
+const Order = require('../models/Order');
 
 class GoogleSheetsService {
   constructor() {
     this.auth = null;
     this.sheets = null;
     this.currentConfig = null;
+    this.isInitialized = false;
   }
 
   async initialize() {
     try {
+      // Éviter la double initialisation
+      if (this.isInitialized && this.sheets) {
+        return { success: true };
+      }
+
       // Vérification des variables d'environnement
       if (!process.env.GOOGLE_SHEETS_PRIVATE_KEY) {
         throw new Error('GOOGLE_SHEETS_PRIVATE_KEY manquant dans .env');
@@ -33,6 +40,7 @@ class GoogleSheetsService {
 
       const authClient = await this.auth.getClient();
       this.sheets = google.sheets({ version: 'v4', auth: authClient });
+      this.isInitialized = true;
 
       // Charger la configuration active par défaut
       await this.loadActiveConfig();
@@ -40,6 +48,7 @@ class GoogleSheetsService {
       return { success: true };
     } catch (error) {
       console.error('Erreur initialisation Google Sheets:', error);
+      this.isInitialized = false;
       throw error;
     }
   }
@@ -94,11 +103,144 @@ class GoogleSheetsService {
       this.currentConfig = config;
       console.log(`Configuration active changée vers: ${config.name}`);
       
+      // Synchroniser automatiquement les commandes de la nouvelle feuille
+      await this.syncOrdersFromNewSheet(config);
+      
       return { success: true, config };
     } catch (error) {
       console.error('Erreur lors du changement de configuration:', error);
       throw error;
     }
+  }
+
+  async syncOrdersFromNewSheet(config) {
+    try {
+      console.log(`🔄 Synchronisation des commandes depuis la nouvelle feuille: ${config.sheetName}`);
+      
+      // Récupérer les données de la nouvelle feuille
+      const sheetData = await this.getData(config.spreadsheetId, config.sheetName);
+      
+      if (!sheetData || sheetData.length < 2) {
+        console.log('⚠️ Aucune donnée trouvée dans la nouvelle feuille');
+        return { success: false, message: 'Aucune donnée trouvée' };
+      }
+
+      // Transformer les données en commandes
+      const [headers, ...rows] = sheetData;
+      const orders = this.transformSheetDataToOrders(rows, headers, config);
+      
+      // Synchroniser avec la base de données
+      const syncResults = await this.syncOrdersToDatabase(orders, config);
+      
+      console.log(`✅ Synchronisation terminée: ${syncResults.created} créées, ${syncResults.updated} mises à jour`);
+      
+      return {
+        success: true,
+        created: syncResults.created,
+        updated: syncResults.updated,
+        total: orders.length
+      };
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation:', error);
+      throw error;
+    }
+  }
+
+  transformSheetDataToOrders(rows, headers, config) {
+    return rows.map((row, index) => {
+      const orderData = {};
+      
+      headers.forEach((header, colIndex) => {
+        const value = row[colIndex] || '';
+        
+        // Mapping des colonnes selon votre structure
+        switch (header.toLowerCase()) {
+          case 'n° commande':
+          case 'numero commande':
+          case 'id':
+            orderData.numeroCommande = value;
+            break;
+          case 'date':
+          case 'date commande':
+            orderData.dateCommande = new Date(value);
+            break;
+          case 'client':
+          case 'nom client':
+            orderData.clientNom = value;
+            break;
+          case 'téléphone':
+          case 'telephone':
+            orderData.clientTelephone = value;
+            break;
+          case 'adresse':
+          case 'adresse livraison':
+            orderData.adresseLivraison = value;
+            break;
+          case 'produit':
+            orderData.produits = [{ nom: value, quantite: 1, prix: 0 }];
+            break;
+          case 'quantité':
+          case 'qte':
+            if (orderData.produits && orderData.produits[0]) {
+              orderData.produits[0].quantite = parseInt(value) || 1;
+            }
+            break;
+          case 'prix':
+            if (orderData.produits && orderData.produits[0]) {
+              orderData.produits[0].prix = parseFloat(value) || 0;
+            }
+            break;
+          case 'boutique':
+            orderData.boutique = value;
+            break;
+          case 'statut':
+            orderData.status = value.toLowerCase() === 'en attente' ? 'en_attente' : 'en_attente';
+            break;
+        }
+      });
+
+      // Ajouter des valeurs par défaut
+      orderData.googleSheetsId = `${config.spreadsheetId}_${config.sheetName}_${index}`;
+      orderData.status = orderData.status || 'en_attente';
+      orderData.boutique = orderData.boutique || 'Boutique principale';
+      
+      return orderData;
+    }).filter(order => order.numeroCommande && order.clientNom); // Filtrer les lignes valides
+  }
+
+  async syncOrdersToDatabase(orders, config) {
+    let created = 0;
+    let updated = 0;
+
+    for (const orderData of orders) {
+      try {
+        // Vérifier si la commande existe déjà
+        const existingOrder = await Order.findOne({
+          $or: [
+            { numeroCommande: orderData.numeroCommande },
+            { googleSheetsId: orderData.googleSheetsId }
+          ]
+        });
+
+        if (existingOrder) {
+          // Mettre à jour la commande existante
+          await Order.findByIdAndUpdate(existingOrder._id, {
+            ...orderData,
+            updatedAt: new Date()
+          });
+          updated++;
+        } else {
+          // Créer une nouvelle commande
+          await Order.create(orderData);
+          created++;
+        }
+      } catch (error) {
+        console.error(`Erreur lors de la synchronisation de la commande ${orderData.numeroCommande}:`, error);
+      }
+    }
+
+    return { created, updated };
   }
 
   async getCurrentConfig() {
@@ -110,6 +252,11 @@ class GoogleSheetsService {
 
   async testAccess(spreadsheetId = null, sheetName = null) {
     try {
+      // S'assurer que le service est initialisé
+      if (!this.isInitialized || !this.sheets) {
+        await this.initialize();
+      }
+
       const testSpreadsheetId = spreadsheetId || this.currentConfig?.spreadsheetId;
       const testSheetName = sheetName || this.currentConfig?.sheetName;
       
@@ -143,7 +290,10 @@ class GoogleSheetsService {
 
   async getData(spreadsheetId = null, sheetName = null) {
     try {
-      if (!this.sheets) await this.initialize();
+      // S'assurer que le service est initialisé
+      if (!this.isInitialized || !this.sheets) {
+        await this.initialize();
+      }
 
       const config = await this.getCurrentConfig();
       const targetSpreadsheetId = spreadsheetId || config.spreadsheetId;
@@ -238,6 +388,21 @@ class GoogleSheetsService {
       return { success: true };
     } catch (error) {
       console.error('Erreur lors de la suppression de la configuration:', error);
+      throw error;
+    }
+  }
+
+  // Méthode pour forcer la synchronisation manuelle
+  async forceSyncOrders() {
+    try {
+      const config = await this.getCurrentConfig();
+      if (!config) {
+        throw new Error('Aucune configuration active');
+      }
+      
+      return await this.syncOrdersFromNewSheet(config);
+    } catch (error) {
+      console.error('Erreur lors de la synchronisation forcée:', error);
       throw error;
     }
   }

@@ -10,7 +10,10 @@ import {
   Settings, 
   RefreshCw,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Database,
+  FileText,
+  Info
 } from 'lucide-react';
 import api from '../api/axios';
 
@@ -21,6 +24,7 @@ const GoogleSheetsConfig = () => {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingConfig, setEditingConfig] = useState(null);
+  const [syncStatus, setSyncStatus] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     spreadsheetId: '',
@@ -137,14 +141,30 @@ const GoogleSheetsConfig = () => {
   const handleActivate = async (configId) => {
     try {
       setLoading(true);
-      await api.post(`/google-sheets/config/${configId}/activate`);
-      toast.success('Configuration activée avec succès');
-      fetchConfigs();
+      setSyncStatus('Synchronisation en cours...');
+      
+      const response = await api.post(`/google-sheets/config/${configId}/activate`);
+      
+      if (response.data.success) {
+        toast.success('Configuration activée avec succès');
+        
+        // Afficher le résultat de la synchronisation
+        if (response.data.syncResult) {
+          const { created, updated, total } = response.data.syncResult;
+          toast.success(
+            `Synchronisation terminée: ${created} nouvelles commandes, ${updated} mises à jour (Total: ${total})`,
+            { duration: 6000 }
+          );
+        }
+        
+        fetchConfigs();
+      }
     } catch (error) {
       console.error('Erreur activation configuration:', error);
       toast.error(error.response?.data?.error || 'Erreur lors de l\'activation');
     } finally {
       setLoading(false);
+      setSyncStatus(null);
     }
   };
 
@@ -171,14 +191,37 @@ const GoogleSheetsConfig = () => {
     }
   };
 
+  const handleManualSync = async () => {
+    try {
+      setLoading(true);
+      setSyncStatus('Synchronisation manuelle en cours...');
+      
+      const response = await api.post('/google-sheets/sync-orders');
+      
+      if (response.data.success) {
+        const { syncResult } = response.data;
+        toast.success(
+          `Synchronisation manuelle terminée: ${syncResult.created} nouvelles commandes, ${syncResult.updated} mises à jour`,
+          { duration: 6000 }
+        );
+      }
+    } catch (error) {
+      console.error('Erreur synchronisation manuelle:', error);
+      toast.error(error.response?.data?.error || 'Erreur lors de la synchronisation');
+    } finally {
+      setLoading(false);
+      setSyncStatus(null);
+    }
+  };
+
   const getSpreadsheetUrl = (spreadsheetId) => {
     return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
   };
 
   if (!user || user.role !== 'admin') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
           <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
             Accès refusé
@@ -192,55 +235,75 @@ const GoogleSheetsConfig = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* En-tête */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
                 Configuration Google Sheets
               </h1>
-              <p className="text-gray-600">
+              <p className="text-sm sm:text-base text-gray-600">
                 Gérez vos connexions Google Sheets et changez de feuille selon vos besoins
               </p>
             </div>
-            <button
-              onClick={() => setShowForm(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Nouvelle configuration
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleManualSync}
+                disabled={loading}
+                className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                <Database className="h-4 w-4 mr-2" />
+                Synchroniser
+              </button>
+              <button
+                onClick={() => setShowForm(true)}
+                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nouvelle configuration
+              </button>
+            </div>
           </div>
         </div>
 
+        {/* Statut de synchronisation */}
+        {syncStatus && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <RefreshCw className="h-5 w-5 text-blue-500 animate-spin mr-3" />
+              <p className="text-sm text-blue-700">{syncStatus}</p>
+            </div>
+          </div>
+        )}
+
         {/* Configuration actuelle */}
         {currentConfig && (
-          <div className="bg-white rounded-lg shadow mb-8 p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-lg shadow mb-6 sm:mb-8 p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
               <h2 className="text-lg font-medium text-gray-900 flex items-center">
                 <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
                 Configuration active
               </h2>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 self-start sm:self-auto">
                 Active
               </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-500">Nom</p>
                 <p className="text-sm text-gray-900">{currentConfig.name}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Spreadsheet ID</p>
-                <div className="flex items-center space-x-2">
-                  <p className="text-sm text-gray-900 font-mono">{currentConfig.spreadsheetId}</p>
+                <div className="flex items-center space-x-2 mt-1">
+                  <p className="text-xs sm:text-sm text-gray-900 font-mono break-all">{currentConfig.spreadsheetId}</p>
                   <a
                     href={getSpreadsheetUrl(currentConfig.spreadsheetId)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800"
+                    className="text-blue-600 hover:text-blue-800 flex-shrink-0"
                   >
                     <ExternalLink className="h-4 w-4" />
                   </a>
@@ -262,7 +325,7 @@ const GoogleSheetsConfig = () => {
 
         {/* Formulaire */}
         {showForm && (
-          <div className="bg-white rounded-lg shadow mb-8 p-6">
+          <div className="bg-white rounded-lg shadow mb-6 sm:mb-8 p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-gray-900">
                 {editingConfig ? 'Modifier la configuration' : 'Nouvelle configuration'}
@@ -276,7 +339,7 @@ const GoogleSheetsConfig = () => {
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                     Nom de la configuration *
@@ -310,7 +373,7 @@ const GoogleSheetsConfig = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="sheetName" className="block text-sm font-medium text-gray-700">
                     Nom de la feuille
@@ -342,18 +405,18 @@ const GoogleSheetsConfig = () => {
                 </div>
               </div>
               
-              <div className="flex items-center justify-between pt-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-4">
                 <button
                   type="button"
                   onClick={() => handleTestAccess(formData.spreadsheetId, formData.sheetName)}
                   disabled={!formData.spreadsheetId || loading}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Tester l'accès
                 </button>
                 
-                <div className="flex space-x-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     type="button"
                     onClick={resetForm}
@@ -364,7 +427,7 @@ const GoogleSheetsConfig = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                    className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                   >
                     {loading ? (
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
@@ -379,9 +442,25 @@ const GoogleSheetsConfig = () => {
           </div>
         )}
 
+        {/* Info sur la synchronisation automatique */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start">
+            <Info className="h-5 w-5 text-blue-500 mr-3 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-medium text-blue-900 mb-1">
+                Synchronisation automatique
+              </h3>
+              <p className="text-sm text-blue-700">
+                Lorsque vous changez de configuration active, les commandes de la nouvelle feuille sont automatiquement synchronisées avec votre base de données. 
+                Vous pouvez également forcer une synchronisation manuelle avec le bouton "Synchroniser".
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Liste des configurations */}
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-medium text-gray-900">
               Toutes les configurations ({configs.length})
             </h2>
@@ -394,7 +473,7 @@ const GoogleSheetsConfig = () => {
             </div>
           ) : configs.length === 0 ? (
             <div className="p-8 text-center">
-              <Settings className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 Aucune configuration
               </h3>
@@ -405,32 +484,32 @@ const GoogleSheetsConfig = () => {
           ) : (
             <div className="divide-y divide-gray-200">
               {configs.map((config) => (
-                <div key={config._id} className="p-6 hover:bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-lg font-medium text-gray-900">
+                <div key={config._id} className="p-4 sm:p-6 hover:bg-gray-50">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+                        <h3 className="text-lg font-medium text-gray-900 truncate">
                           {config.name}
                         </h3>
                         {config.isActive && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 self-start sm:self-auto">
                             Active
                           </span>
                         )}
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                         <div>
                           <span className="font-medium text-gray-500">Spreadsheet ID:</span>
                           <div className="flex items-center space-x-2 mt-1">
-                            <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                            <code className="text-xs bg-gray-100 px-2 py-1 rounded break-all">
                               {config.spreadsheetId}
                             </code>
                             <a
                               href={getSpreadsheetUrl(config.spreadsheetId)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800"
+                              className="text-blue-600 hover:text-blue-800 flex-shrink-0"
                             >
                               <ExternalLink className="h-4 w-4" />
                             </a>
@@ -451,18 +530,18 @@ const GoogleSheetsConfig = () => {
                       </div>
                       
                       {config.description && (
-                        <p className="text-sm text-gray-600 mt-2">
+                        <p className="text-sm text-gray-600 mt-3">
                           {config.description}
                         </p>
                       )}
                     </div>
                     
-                    <div className="flex items-center space-x-2 ml-6">
+                    <div className="flex flex-col sm:flex-row gap-2 lg:flex-col lg:gap-2">
                       {!config.isActive && (
                         <button
                           onClick={() => handleActivate(config._id)}
                           disabled={loading}
-                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                          className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
                           Activer
@@ -472,7 +551,7 @@ const GoogleSheetsConfig = () => {
                       <button
                         onClick={() => handleEdit(config)}
                         disabled={loading}
-                        className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                        className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                       >
                         <Edit className="h-4 w-4 mr-1" />
                         Modifier
@@ -482,7 +561,7 @@ const GoogleSheetsConfig = () => {
                         <button
                           onClick={() => handleDelete(config._id)}
                           disabled={loading}
-                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                          className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
                         >
                           <Trash2 className="h-4 w-4 mr-1" />
                           Supprimer
