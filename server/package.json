@@ -24,7 +24,8 @@
     "test:dashboard": "node test-dashboard-active-sheet.js",
     "test:admin": "node test-admin-activity.js",
     "test:admin-access": "node test-admin-access.js",
-    "create:admin": "node create-admin-user.js"
+    "create:admin": "node create-admin-user.js",
+    "fix:closeur-rights": "node fix-closeur-rights.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -157,11 +157,6 @@ router.get('/assigned', authenticate, requireRole(['admin', 'closeur', 'livreur'
 
 module.exports = router;
 
-// =====================
-// Routes attendues par le Dashboard
-// =====================
-
-// GET /api/orders - Liste paginée des commandes récentes
 router.get('/', authenticate, requireRole(['admin', 'closeur', 'livreur']), async (req, res) => {
   try {
     const {

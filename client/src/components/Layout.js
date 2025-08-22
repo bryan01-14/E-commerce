@@ -35,12 +35,30 @@ const Layout = () => {
     ...(user?.role === 'livreur' ? [{ name: 'commande', href: '/orderlivreur', icon: Users }] : []),
     ...(user?.role === 'admin' || user?.role === 'closeur'  ? [{ name: 'Attribuer Commandes', href: '/orders', icon: Package }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Utilisateurs', href: '/users', icon: Users }] : []),
-    ...(user?.role === 'admin' ? [{ name: 'Utilisateurs', href: '/users', icon: Users }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Surveillance Activités', href: '/admin-activity', icon: Activity }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Total des commandes', href: '/google-sheets', icon: Database }] : []),
     ...(user?.role === 'admin' ? [{ name: 'Config Google Sheets', href: '/google-sheets-config', icon: Settings }] : []),
     { name: 'Paramètres', href: '/settings', icon: Settings },
   ];
+
+  // Debug: Afficher les informations de l'utilisateur
+  console.log('🔍 Debug Layout - Utilisateur:', {
+    user: user ? {
+      id: user._id,
+      nom: user.nom,
+      prenom: user.prenom,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive
+    } : 'Non connecté',
+    navigationItems: navigation.length,
+    adminItems: navigation.filter(item => 
+      item.name === 'Surveillance Activités' || 
+      item.name === 'Utilisateurs' || 
+      item.name === 'Total des commandes' || 
+      item.name === 'Config Google Sheets'
+    ).length
+  });
 
   const getRoleLabel = (role) => {
     switch (role) {
