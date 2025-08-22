@@ -20,7 +20,8 @@
     "quick:diagnose": "node quick-diagnose.js",
     "test:total-update": "node test-total-update.js",
     "test:performance": "node test-sync-performance.js",
-    "test:config-update": "node test-config-update.js"
+    "test:config-update": "node test-config-update.js",
+    "test:dashboard": "node test-dashboard-active-sheet.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

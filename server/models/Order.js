@@ -45,6 +45,11 @@ const orderSchema = new mongoose.Schema({
     required: function() {
       return this.status !== 'en_attente';
     }
+  },
+  activeSheetConfig: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'GoogleSheetsConfig',
+    required: false
   }
 }, { timestamps: true });
 

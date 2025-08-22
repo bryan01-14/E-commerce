@@ -1015,9 +1015,14 @@ class GoogleSheetsService {
       
       const Order = require('../models/Order');
       
+      // Récupérer la configuration active
+      const activeConfig = await this.getCurrentConfig();
+      if (!activeConfig) {
+        throw new Error('Aucune configuration active trouvée pour la synchronisation');
+      }
+      
       // 1. Préparer les opérations en lot (bulk operations)
       const bulkOps = [];
-      const updateOps = [];
       
       for (const order of orders) {
         // Créer un identifiant unique pour la commande
@@ -1034,6 +1039,7 @@ class GoogleSheetsService {
             update: { 
               $set: {
                 ...order,
+                activeSheetConfig: activeConfig._id,
                 lastUpdated: new Date()
               }
             },

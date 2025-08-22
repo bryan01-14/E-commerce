@@ -175,12 +175,21 @@ router.get('/', authenticate, requireRole(['admin', 'closeur', 'livreur']), asyn
     const limitNum = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
     const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
+    // Récupérer la configuration Google Sheets active
+    const GoogleSheetsConfig = require('../models/GoogleSheetsConfig');
+    const activeConfig = await GoogleSheetsConfig.findOne({ isActive: true });
+    
     // Filtrage selon rôle
     const filter = {};
     if (req.user.role === 'livreur') {
       filter.livreurId = req.user._id;
     } else if (req.user.role === 'closeur' && req.user.boutique) {
       filter.boutique = req.user.boutique;
+    }
+    
+    // Filtrer par configuration active si elle existe
+    if (activeConfig) {
+      filter.activeSheetConfig = activeConfig._id;
     }
 
     const sortOptions = { [sortBy]: sortDirection };
@@ -231,14 +240,25 @@ router.get('/', authenticate, requireRole(['admin', 'closeur', 'livreur']), asyn
   }
 });
 
-// GET /api/orders/stats/overview - Statistiques pour le dashboard
+// GET /api/orders/stats/overview - Statistiques pour le dashboard (basées sur la configuration active)
 router.get('/stats/overview', authenticate, requireRole(['admin', 'closeur', 'livreur']), async (req, res) => {
   try {
+    // Récupérer la configuration Google Sheets active
+    const GoogleSheetsConfig = require('../models/GoogleSheetsConfig');
+    const activeConfig = await GoogleSheetsConfig.findOne({ isActive: true });
+    
     const match = {};
+    
+    // Filtrer par rôle utilisateur
     if (req.user.role === 'livreur') {
       match.livreurId = req.user._id;
     } else if (req.user.role === 'closeur' && req.user.boutique) {
       match.boutique = req.user.boutique;
+    }
+    
+    // Filtrer par configuration active si elle existe
+    if (activeConfig) {
+      match.activeSheetConfig = activeConfig._id;
     }
 
     const [byStatus, totals] = await Promise.all([
@@ -267,7 +287,12 @@ router.get('/stats/overview', authenticate, requireRole(['admin', 'closeur', 'li
     res.json({
       total,
       totalValue,
-      statsByStatus
+      statsByStatus,
+      activeSheetConfig: activeConfig ? {
+        name: activeConfig.name,
+        sheetName: activeConfig.sheetName,
+        spreadsheetId: activeConfig.spreadsheetId
+      } : null
     });
   } catch (error) {
     console.error('Erreur stats overview:', error);

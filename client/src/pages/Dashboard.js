@@ -17,6 +17,7 @@ const Dashboard = () => {
   const [stats, setStats] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeSheetConfig, setActiveSheetConfig] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -29,6 +30,11 @@ const Dashboard = () => {
         ]);
         setStats(stats.data);
         setRecentOrders(orders.data.orders || []);
+        
+        // Récupérer les informations de la configuration active
+        if (stats.data.activeSheetConfig) {
+          setActiveSheetConfig(stats.data.activeSheetConfig);
+        }
       } catch (err) {
         console.error('Dashboard error:', err);
       } finally {
@@ -85,6 +91,42 @@ const Dashboard = () => {
         <p className="mt-1 text-sm text-gray-500">
           Bienvenue, {user?.prenom} {user?.nom}
         </p>
+        
+        {/* Configuration active */}
+        {activeSheetConfig ? (
+          <div className="mt-3 p-3 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-green-800">
+                  Configuration active : {activeSheetConfig.name}
+                </p>
+                <p className="text-xs text-green-600">
+                  Feuille : {activeSheetConfig.sheetName} | 
+                  Spreadsheet ID : {activeSheetConfig.spreadsheetId.substring(0, 20)}...
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-yellow-800">
+                  Aucune configuration Google Sheets active
+                </p>
+                <p className="text-xs text-yellow-600">
+                  Les données affichées proviennent de toutes les configurations
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
