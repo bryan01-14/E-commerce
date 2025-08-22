@@ -14,7 +14,8 @@
     "auto:fix:sync": "node auto-fix-sync.js",
     "validate:sheets": "node validate-sheet-names.js",
     "test:any-sheet": "node test-any-sheet.js",
-    "diagnose:sheet": "node diagnose-sheet-issue.js"
+    "diagnose:sheet": "node diagnose-sheet-issue.js",
+    "check:permissions": "node check-permissions.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
