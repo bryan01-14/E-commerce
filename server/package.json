@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "migrate:google-sheets": "node migrations/initGoogleSheetsConfig.js",
+    "test:google-sheets": "node test-google-sheets-config.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
