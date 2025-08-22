@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
-const { authenticate, requireAdmin } = require('../middleware/auth');
+const { authenticate, requireAdmin, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -19,7 +19,7 @@ router.get('/check-admin', async (req, res) => {
 });
 
 // GET /api/users - Récupérer tous les utilisateurs
-router.get('/', authenticate, requireAdmin, async (req, res) => {
+router.get('/', authenticate, requireRole(['admin', 'closeur']), async (req, res) => {
   try {
     const {
       page = 1,
@@ -99,7 +99,7 @@ router.get('/livreurs', authenticate, async (req, res) => {
 });
 
 // POST /api/users - Créer un nouvel utilisateur
-router.post('/', authenticate, requireAdmin, [
+router.post('/', authenticate, requireRole(['admin', 'closeur']), [
   body('username')
     .trim()
     .isLength({ min: 3, max: 50 })
@@ -150,6 +150,13 @@ router.post('/', authenticate, requireAdmin, [
 
     const { username, email, password, nom, prenom, role, boutique, telephone } = req.body;
 
+    // Vérifier les permissions selon le rôle de l'utilisateur connecté
+    if (req.user.role === 'closeur' && role !== 'livreur') {
+      return res.status(403).json({ 
+        error: 'Les closeurs ne peuvent créer que des livreurs' 
+      });
+    }
+
     // Vérifier si l'utilisateur existe déjà
     const existingUser = await User.findOne({
       $or: [{ username }, { email }]
@@ -189,12 +196,19 @@ router.post('/', authenticate, requireAdmin, [
 });
 
 // GET /api/users/:id - Récupérer un utilisateur spécifique
-router.get('/:id', authenticate, requireAdmin, async (req, res) => {
+router.get('/:id', authenticate, requireRole(['admin', 'closeur']), async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
 
     if (!user) {
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    // Vérifier les permissions selon le rôle de l'utilisateur connecté
+    if (req.user.role === 'closeur' && user.role !== 'livreur') {
+      return res.status(403).json({ 
+        error: 'Les closeurs ne peuvent voir que les livreurs' 
+      });
     }
 
     res.json({ user });
