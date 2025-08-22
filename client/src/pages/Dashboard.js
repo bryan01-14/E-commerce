@@ -305,15 +305,15 @@ const Dashboard = () => {
             </h3>
             <div className="space-y-3">
               <button className="w-full btn-primary">
-                Voir toutes les commandes
+                <a href="/orders">Voir toutes les commandes</a>
               </button>
               {user?.role === 'admin' && (
                 <button className="w-full btn-secondary">
-                  Gérer les utilisateurs
+                  <a href="/users">Gérer les utilisateurs</a>
                 </button>
               )}
               <button className="w-full btn-secondary">
-                Paramètres
+                <a href="/settings">Paramètres</a>
               </button>
             </div>
           </div>
