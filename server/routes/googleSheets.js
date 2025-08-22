@@ -82,10 +82,33 @@ router.post('/config', authenticate, requireRole(['admin']), async (req, res) =>
   try {
     const { name, spreadsheetId, sheetName, description } = req.body;
     
+    console.log('📝 Création de configuration demandée:', { name, spreadsheetId, sheetName, description });
+    
+    // Validation des champs requis
     if (!name || !spreadsheetId) {
       return res.status(400).json({
         success: false,
-        error: "Le nom et l'ID du spreadsheet sont requis"
+        error: "Le nom et l'ID du spreadsheet sont requis",
+        message: "Veuillez remplir tous les champs obligatoires",
+        suggestions: [
+          "Vérifiez que le nom de la configuration est rempli",
+          "Vérifiez que l'ID du spreadsheet est correct",
+          "L'ID du spreadsheet se trouve dans l'URL de votre Google Sheet"
+        ]
+      });
+    }
+
+    // Validation du format de l'ID du spreadsheet
+    if (!spreadsheetId.match(/^[a-zA-Z0-9-_]+$/)) {
+      return res.status(400).json({
+        success: false,
+        error: "Format d'ID de spreadsheet invalide",
+        message: "L'ID du spreadsheet contient des caractères invalides",
+        suggestions: [
+          "L'ID du spreadsheet se trouve dans l'URL de votre Google Sheet",
+          "Exemple d'URL: https://docs.google.com/spreadsheets/d/1ABC123.../edit",
+          "L'ID est la partie entre /d/ et /edit"
+        ]
       });
     }
 
@@ -97,17 +120,60 @@ router.post('/config', authenticate, requireRole(['admin']), async (req, res) =>
       createdBy: req.user._id
     };
 
+    console.log('🔧 Données de configuration à créer:', configData);
+
     const config = await sheetsService.createConfig(configData);
+    
+    console.log('✅ Configuration créée avec succès:', config._id);
     
     res.status(201).json({
       success: true,
-      config
+      config,
+      message: 'Configuration créée avec succès'
     });
+    
   } catch (error) {
-    console.error("Erreur création configuration:", error);
+    console.error("❌ Erreur création configuration:", error);
+    
+    // Gérer les erreurs de validation Mongoose
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        error: 'Erreur de validation',
+        message: 'Les données fournies ne sont pas valides',
+        details: validationErrors,
+        suggestions: [
+          'Vérifiez que tous les champs sont correctement remplis',
+          'Assurez-vous que le nom est unique',
+          'Vérifiez le format de l\'ID du spreadsheet'
+        ]
+      });
+    }
+    
+    // Gérer les erreurs de duplication
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        error: 'Configuration en double',
+        message: 'Une configuration avec ce nom existe déjà',
+        suggestions: [
+          'Utilisez un nom différent pour cette configuration',
+          'Ou modifiez la configuration existante'
+        ]
+      });
+    }
+    
+    // Erreur générique
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Erreur serveur lors de la création',
+      message: 'Erreur serveur. Vérifiez la console pour plus de détails.',
+      suggestions: [
+        'Vérifiez que tous les champs sont remplis',
+        'Vérifiez le format de l\'ID du spreadsheet',
+        'Vérifiez que le nom est unique'
+      ]
     });
   }
 });
@@ -183,21 +249,89 @@ router.post('/config/test', authenticate, requireRole(['admin']), async (req, re
     if (!spreadsheetId) {
       return res.status(400).json({
         success: false,
-        error: "L'ID du spreadsheet est requis"
+        error: "L'ID du spreadsheet est requis",
+        message: "Veuillez fournir l'ID du spreadsheet"
       });
     }
 
+    console.log(`🔍 Test d'accès demandé pour: ${spreadsheetId}, feuille: "${sheetName}"`);
+
     const testResult = await sheetsService.testAccess(spreadsheetId, sheetName);
+    
+    console.log('✅ Test d\'accès réussi:', testResult);
     
     res.json({
       success: true,
-      testResult
+      testResult,
+      message: 'Test d\'accès réussi'
     });
+    
   } catch (error) {
-    console.error("Erreur test accès:", error);
+    console.error("❌ Erreur test accès:", error);
+    
+    // Gérer les erreurs structurées du service
+    if (error.success === false && error.suggestions) {
+      return res.status(400).json({
+        success: false,
+        error: error.error || error.message,
+        suggestions: error.suggestions,
+        message: error.message || 'Erreur lors du test d\'accès',
+        originalError: error.originalError || error.message
+      });
+    }
+    
+    // Gérer les erreurs de permissions
+    if (error.message && error.message.includes('Accès refusé')) {
+      return res.status(403).json({
+        success: false,
+        error: 'Accès refusé au Google Sheet',
+        message: 'Le compte de service n\'a pas accès au spreadsheet',
+        suggestions: [
+          'Vérifiez que le compte de service a accès au spreadsheet',
+          'Partagez le spreadsheet avec l\'email du compte de service',
+          'Donnez les permissions "Éditeur" au compte de service'
+        ]
+      });
+    }
+    
+    // Gérer les erreurs de feuille inexistante
+    if (error.message && error.message.includes('n\'existe pas')) {
+      return res.status(404).json({
+        success: false,
+        error: 'Feuille non trouvée',
+        message: 'La feuille configurée n\'existe pas dans le spreadsheet',
+        suggestions: [
+          'Vérifiez le nom exact de la feuille dans Google Sheets',
+          'Utilisez une des feuilles disponibles',
+          'Ou créez une nouvelle feuille avec le nom configuré'
+        ]
+      });
+    }
+    
+    // Gérer les erreurs de parsing
+    if (error.message && error.message.includes('Unable to parse range')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Erreur de format du nom de feuille',
+        message: 'Le nom de la feuille ne peut pas être lu',
+        suggestions: [
+          'Vérifiez que le nom de la feuille est correct',
+          'Évitez les caractères spéciaux dans le nom',
+          'Utilisez des noms simples'
+        ]
+      });
+    }
+    
+    // Erreur générique
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Erreur serveur lors du test d\'accès',
+      message: 'Erreur serveur. Vérifiez la console pour plus de détails.',
+      suggestions: [
+        'Vérifiez que le spreadsheet ID est correct',
+        'Vérifiez que la feuille existe',
+        'Vérifiez les permissions du compte de service'
+      ]
     });
   }
 });
