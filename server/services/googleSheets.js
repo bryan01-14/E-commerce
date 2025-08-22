@@ -110,8 +110,8 @@ class GoogleSheetsService {
         
         // Fallback sur les variables d'environnement
         const fallbackConfig = {
-          spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "128tqEErdDvs7cWwtSbRl69aRj2cHaBFlebPBDjHmDQ",
-          sheetName: process.env.GOOGLE_SHEETS_SHEET_NAME || 'Feuille 1',
+          spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "1QnulUnO9SfUfRUstTD1YKsNQIR18dd-JJ-qqPU0OmNU",
+          sheetName: process.env.GOOGLE_SHEETS_SHEET_NAME || 'Feuille2',
           name: 'Configuration par défaut (fallback)'
         };
         
