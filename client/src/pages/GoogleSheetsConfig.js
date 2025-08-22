@@ -208,32 +208,59 @@ const GoogleSheetsConfig = () => {
     } catch (error) {
       console.error('Erreur synchronisation manuelle:', error);
       
-      // Afficher un message d'erreur plus informatif
+      // Afficher un message d'erreur plus informatif avec suggestions
       let errorMessage = 'Erreur lors de la synchronisation';
+      let suggestions = [];
       
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
+        suggestions = error.response.data.suggestions || [];
       } else if (error.message) {
         errorMessage = error.message;
       }
       
-      // Suggestions selon le type d'erreur
+      // Afficher l'erreur principale
+      toast.error(errorMessage, { duration: 8000 });
+      
+      // Afficher les suggestions d'aide si disponibles
+      if (suggestions.length > 0) {
+        setTimeout(() => {
+          toast.error(
+            `💡 Suggestions: ${suggestions[0]}`,
+            { duration: 10000 }
+          );
+          
+          // Afficher les autres suggestions
+          suggestions.slice(1).forEach((suggestion, index) => {
+            setTimeout(() => {
+              toast.error(
+                `💡 Suggestion ${index + 2}: ${suggestion}`,
+                { duration: 8000 }
+              );
+            }, (index + 1) * 2000);
+          });
+        }, 1000);
+      }
+      
+      // Afficher des suggestions d'aide selon le type d'erreur
       if (errorMessage.includes('Aucune configuration active')) {
         errorMessage += '. Créez d\'abord une configuration Google Sheets.';
       } else if (errorMessage.includes('Accès refusé')) {
         errorMessage += '. Vérifiez les permissions du compte de service.';
       } else if (errorMessage.includes('Configuration incomplète')) {
         errorMessage += '. Vérifiez que tous les champs sont remplis.';
+      } else if (errorMessage.includes('format du nom de feuille')) {
+        errorMessage += '. Vérifiez le nom de la feuille dans Google Sheets.';
       }
-      
-      toast.error(errorMessage, { duration: 8000 });
       
       // Afficher des suggestions d'aide
       if (error.response?.status === 500) {
-        toast.error(
-          'Erreur serveur. Vérifiez la console pour plus de détails.',
-          { duration: 5000 }
-        );
+        setTimeout(() => {
+          toast.error(
+            '🔧 Erreur serveur. Utilisez les scripts de diagnostic pour identifier le problème.',
+            { duration: 8000 }
+          );
+        }, 3000);
       }
     } finally {
       setLoading(false);

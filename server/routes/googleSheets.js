@@ -234,14 +234,51 @@ router.post('/sync-orders', authenticate, requireRole(['admin']), async (req, re
       user: req.user?.username
     });
     
-    // Retourner une erreur structurée
+    // Gestion spécifique des erreurs de parsing de range
+    let userFriendlyError = error.message;
+    let suggestions = [];
+    
+    if (error.message.includes('Unable to parse range')) {
+      userFriendlyError = 'Erreur de format du nom de feuille Google Sheets';
+      suggestions = [
+        'Vérifiez que le nom de la feuille est correct',
+        'Les noms avec espaces doivent être entre guillemets',
+        'Évitez les caractères spéciaux dans les noms de feuilles',
+        'Exemples valides: "Feuille 1", "Commandes", "Sheet1"'
+      ];
+    } else if (error.message.includes('Accès refusé')) {
+      userFriendlyError = 'Accès refusé au Google Sheet';
+      suggestions = [
+        'Vérifiez que le compte de service a accès au spreadsheet',
+        'Partagez le spreadsheet avec l\'email du compte de service',
+        'Donnez les permissions "Éditeur" au compte de service'
+      ];
+    } else if (error.message.includes('Configuration incomplète')) {
+      userFriendlyError = 'Configuration Google Sheets incomplète';
+      suggestions = [
+        'Vérifiez que tous les champs sont remplis',
+        'L\'ID du spreadsheet et le nom de la feuille sont obligatoires'
+      ];
+    } else if (error.message.includes('Aucune configuration active')) {
+      userFriendlyError = 'Aucune configuration Google Sheets active';
+      suggestions = [
+        'Créez une nouvelle configuration',
+        'Activez une configuration existante',
+        'Vérifiez que la base de données est initialisée'
+      ];
+    }
+    
+    // Retourner une erreur structurée avec suggestions
     res.status(500).json({
       success: false,
-      error: error.message || 'Erreur lors de la synchronisation',
+      error: userFriendlyError,
       details: process.env.NODE_ENV === 'development' ? {
+        originalError: error.message,
         stack: error.stack,
         type: error.constructor.name
-      } : undefined
+      } : undefined,
+      suggestions: suggestions,
+      help: suggestions.length > 0 ? 'Consultez les suggestions ci-dessous pour résoudre le problème' : undefined
     });
   }
 });

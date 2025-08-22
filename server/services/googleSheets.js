@@ -373,6 +373,7 @@ class GoogleSheetsService {
       }
 
       console.log(`🔍 Test d'accès au spreadsheet: ${testSpreadsheetId}`);
+      console.log(`📋 Nom de feuille testé: "${testSheetName}"`);
 
       const response = await this.sheets.spreadsheets.get({
         spreadsheetId: testSpreadsheetId,
@@ -384,6 +385,39 @@ class GoogleSheetsService {
       
       console.log(`✅ Accès réussi au spreadsheet: ${response.data.properties.title}`);
       console.log(`   Feuilles disponibles: ${availableSheets.join(', ')}`);
+      console.log(`   Feuille testée existe: ${sheetExists}`);
+      
+      // Vérifier si la feuille testée peut être lue
+      if (testSheetName && sheetExists) {
+        try {
+          const encodedSheetName = this.encodeSheetName(testSheetName);
+          const testRange = `${encodedSheetName}!A1`;
+          console.log(`🔍 Test de lecture de la feuille: ${testRange}`);
+          
+          await this.sheets.spreadsheets.values.get({
+            spreadsheetId: testSpreadsheetId,
+            range: testRange,
+          });
+          
+          console.log('✅ Lecture de la feuille réussie');
+        } catch (readError) {
+          console.log('⚠️ Erreur lors de la lecture de la feuille:', readError.message);
+          // Essayer avec des guillemets
+          try {
+            const quotedRange = `'${testSheetName}'!A1`;
+            console.log(`🔄 Tentative avec guillemets: ${quotedRange}`);
+            
+            await this.sheets.spreadsheets.values.get({
+              spreadsheetId: testSpreadsheetId,
+              range: quotedRange,
+            });
+            
+            console.log('✅ Lecture avec guillemets réussie');
+          } catch (quotedError) {
+            console.log('❌ Échec de la lecture même avec guillemets:', quotedError.message);
+          }
+        }
+      }
       
       return {
         success: true,
@@ -397,7 +431,8 @@ class GoogleSheetsService {
       throw new Error(`Accès refusé au Google Sheet. Vérifiez: 
         1. L'ID du spreadsheet
         2. Le compte de service a bien accès
-        3. La feuille existe dans le document`);
+        3. La feuille existe dans le document
+        4. Le nom de la feuille est correct (espaces, caractères spéciaux)`);
     }
   }
 
@@ -413,8 +448,13 @@ class GoogleSheetsService {
       const targetSpreadsheetId = spreadsheetId || config.spreadsheetId;
       const targetSheetName = sheetName || config.sheetName;
       
-      const range = `${targetSheetName}!A:Z`;
+      // Encoder correctement le nom de la feuille pour Google Sheets API
+      const encodedSheetName = this.encodeSheetName(targetSheetName);
+      const range = `${encodedSheetName}!A:Z`;
+      
       console.log(`📖 Lecture des données: ${range} depuis ${targetSpreadsheetId}`);
+      console.log(`📋 Nom de feuille original: "${targetSheetName}"`);
+      console.log(`🔧 Nom de feuille encodé: "${encodedSheetName}"`);
 
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: targetSpreadsheetId,
@@ -431,8 +471,52 @@ class GoogleSheetsService {
         code: error.code,
         errors: error.errors
       });
+      
+      // Si l'erreur est liée au parsing du range, essayer avec des guillemets
+      if (error.message.includes('Unable to parse range')) {
+        console.log('🔄 Tentative avec guillemets pour le nom de feuille...');
+        try {
+          const config = await this.getCurrentConfig();
+          const targetSpreadsheetId = spreadsheetId || config.spreadsheetId;
+          const targetSheetName = sheetName || config.sheetName;
+          
+          // Essayer avec des guillemets simples
+          const quotedRange = `'${targetSheetName}'!A:Z`;
+          console.log(`🔄 Nouvelle tentative avec: ${quotedRange}`);
+          
+          const response = await this.sheets.spreadsheets.values.get({
+            spreadsheetId: targetSpreadsheetId,
+            range: quotedRange,
+          });
+
+          const data = response.data.values || [];
+          console.log(`✅ ${data.length} lignes récupérées avec guillemets`);
+          return data;
+        } catch (retryError) {
+          console.error('❌ Échec de la tentative avec guillemets:', retryError.message);
+        }
+      }
+      
       throw error;
     }
+  }
+
+  // Méthode pour encoder correctement les noms de feuilles
+  encodeSheetName(sheetName) {
+    if (!sheetName) return 'Sheet1';
+    
+    // Si le nom contient des espaces, des caractères spéciaux ou commence par un chiffre
+    if (sheetName.includes(' ') || 
+        sheetName.includes('\'') || 
+        sheetName.includes('"') || 
+        /^[0-9]/.test(sheetName) ||
+        /[^\w\s]/.test(sheetName)) {
+      
+      // Encoder avec des guillemets simples
+      return `'${sheetName.replace(/'/g, "\\'")}'`;
+    }
+    
+    return sheetName;
   }
 
   async getAllConfigs() {
