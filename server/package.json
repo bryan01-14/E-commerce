@@ -18,7 +18,8 @@
     "check:permissions": "node check-permissions.js",
     "test:universal": "node test-universal-sheets.js",
     "quick:diagnose": "node quick-diagnose.js",
-    "test:total-update": "node test-total-update.js"
+    "test:total-update": "node test-total-update.js",
+    "test:performance": "node test-sync-performance.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

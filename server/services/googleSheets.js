@@ -137,12 +137,12 @@ class GoogleSheetsService {
 
   async setActiveConfig(configId) {
     try {
-      console.log(`🔄 Activation de la configuration: ${configId}`);
+      console.log(`🚀 Activation ultra-rapide de la configuration: ${configId}`);
       
-      // Désactiver toutes les configurations
+      // 1. Désactiver toutes les configurations (opération rapide)
       await GoogleSheetsConfig.updateMany({}, { isActive: false });
       
-      // Activer la configuration sélectionnée
+      // 2. Activer la configuration sélectionnée
       const config = await GoogleSheetsConfig.findByIdAndUpdate(
         configId,
         { isActive: true, lastUsed: new Date() },
@@ -157,49 +157,53 @@ class GoogleSheetsService {
       console.log(`   Spreadsheet ID: ${config.spreadsheetId}`);
       console.log(`   Nom de feuille: "${config.sheetName}"`);
       
-      // Vérifier automatiquement l'accès à la nouvelle feuille
-      console.log('🔍 Vérification automatique de l\'accès à la nouvelle feuille...');
+      // 3. Synchronisation ultra-rapide en parallèle
+      console.log('⚡ Démarrage de la synchronisation ultra-rapide...');
+      
       try {
-        const accessResult = await this.testAccess(config.spreadsheetId, config.sheetName);
-        console.log('✅ Accès à la nouvelle feuille vérifié avec succès');
+        // Vérifier l'accès ET récupérer les données en parallèle
+        const [accessResult, sheetData] = await Promise.all([
+          this.testAccess(config.spreadsheetId, config.sheetName),
+          this.getData(config.spreadsheetId, config.sheetName)
+        ]);
+        
+        console.log('✅ Accès et lecture des données réussis en parallèle');
         console.log(`   Titre du spreadsheet: ${accessResult.spreadsheetTitle}`);
-        console.log(`   Feuilles disponibles: ${accessResult.availableSheets.join(', ')}`);
-        console.log(`   Feuille configurée existe: ${accessResult.sheetExists ? 'OUI' : 'NON'}`);
+        console.log(`   Données récupérées: ${sheetData.length} lignes`);
         
         if (!accessResult.sheetExists) {
           console.log('⚠️ ATTENTION: La feuille configurée n\'existe pas !');
-          console.log(`   Feuille configurée: "${config.sheetName}"`);
           console.log(`   Feuilles disponibles: ${accessResult.availableSheets.join(', ')}`);
           
-          // Suggérer des corrections automatiques
           if (accessResult.availableSheets.length > 0) {
             console.log('💡 Suggestion: Utilisez une des feuilles disponibles');
             console.log('   Feuilles suggérées:', accessResult.availableSheets.join(', '));
           }
         }
         
-        // Synchroniser automatiquement TOUTES les données de la nouvelle feuille
-        console.log('🔄 Synchronisation complète des données de la nouvelle feuille...');
-        console.log('📊 Récupération de toutes les données pour mise à jour du total...');
+        // 4. Synchronisation ultra-rapide avec optimisations
+        console.log('⚡ Synchronisation ultra-rapide des données...');
+        const startTime = Date.now();
         
-        // 1. Récupérer toutes les données de la nouvelle feuille
-        const allData = await this.getData(config.spreadsheetId, config.sheetName);
-        console.log(`📋 Données récupérées: ${allData.length} lignes au total`);
+        const syncResult = await this.syncOrdersUltraFast(sheetData, config);
         
-        // 2. Synchroniser complètement avec la base de données
-        const syncResult = await this.syncOrdersFromNewSheet(config);
-        console.log('✅ Synchronisation complète réussie');
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        
+        console.log(`⚡ Synchronisation terminée en ${duration}ms !`);
         console.log(`   Nouvelles commandes: ${syncResult.created}`);
         console.log(`   Commandes mises à jour: ${syncResult.updated}`);
         console.log(`   Total traité: ${syncResult.total}`);
         
-        // 3. Vérifier le total final des commandes
+        // 5. Statistiques rapides
         const Order = require('../models/Order');
-        const totalOrders = await Order.countDocuments();
-        const activeOrders = await Order.countDocuments({ status: { $ne: 'livré' } });
-        const deliveredOrders = await Order.countDocuments({ status: 'livré' });
+        const [totalOrders, activeOrders, deliveredOrders] = await Promise.all([
+          Order.countDocuments(),
+          Order.countDocuments({ status: { $ne: 'livré' } }),
+          Order.countDocuments({ status: 'livré' })
+        ]);
         
-        console.log('📊 Statistiques finales après changement de feuille:');
+        console.log('📊 Statistiques finales ultra-rapides:');
         console.log(`   Total des commandes: ${totalOrders}`);
         console.log(`   Commandes actives: ${activeOrders}`);
         console.log(`   Commandes livrées: ${deliveredOrders}`);
@@ -214,18 +218,21 @@ class GoogleSheetsService {
             active: activeOrders,
             delivered: deliveredOrders
           },
-          message: 'Configuration activée et total des commandes mis à jour avec succès'
+          performance: {
+            syncDuration: duration,
+            speed: duration < 1000 ? 'Ultra-rapide' : duration < 3000 ? 'Rapide' : 'Normal'
+          },
+          message: `Configuration activée et synchronisée en ${duration}ms !`
         };
         
-      } catch (accessError) {
-        console.error('❌ Erreur lors de la vérification de l\'accès:', accessError.message);
+      } catch (error) {
+        console.error('❌ Erreur lors de la synchronisation ultra-rapide:', error.message);
         
-        // Retourner des informations détaillées pour l'interface
         return {
           success: false,
           config,
-          error: accessError.message,
-          message: 'Configuration activée mais erreur d\'accès à la feuille',
+          error: error.message,
+          message: 'Configuration activée mais erreur de synchronisation',
           suggestions: [
             'Vérifiez que le nom de la feuille est correct',
             'Vérifiez que la feuille existe dans le spreadsheet',
@@ -301,43 +308,32 @@ class GoogleSheetsService {
       }
 
       const [headers, ...rows] = sheetData;
-      console.log(`📋 En-têtes détectés: ${headers.join(', ')}`);
-      console.log(`📊 Lignes de données à traiter: ${rows.length}`);
+      console.log(`⚡ Transformation ultra-rapide de ${rows.length} lignes avec ${headers.length} colonnes`);
 
-      // Mapping intelligent des colonnes
+      // Mapping intelligent des colonnes (une seule fois)
       const columnMapping = this.detectColumnMapping(headers);
       console.log('🔍 Mapping des colonnes détecté:', columnMapping);
 
-      const orders = [];
-      let validOrders = 0;
-      let skippedRows = 0;
-
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        
-        // Ignorer les lignes vides
-        if (!row || row.every(cell => !cell || cell.toString().trim() === '')) {
-          skippedRows++;
-          continue;
-        }
-
-        try {
-          const order = this.createOrderFromRow(row, headers, columnMapping, i + 2); // +2 car on commence à la ligne 2 (après les en-têtes)
-          if (order) {
-            orders.push(order);
-            validOrders++;
-          } else {
-            skippedRows++;
+      // Transformation ultra-rapide avec map et filter
+      const orders = rows
+        .map((row, index) => {
+          // Ignorer les lignes vides rapidement
+          if (!row || row.every(cell => !cell || cell.toString().trim() === '')) {
+            return null;
           }
-        } catch (rowError) {
-          console.log(`⚠️ Erreur lors du traitement de la ligne ${i + 2}:`, rowError.message);
-          skippedRows++;
-        }
-      }
 
-      console.log(`✅ Transformation terminée: ${validOrders} commandes valides, ${skippedRows} lignes ignorées`);
+          try {
+            return this.createOrderFromRow(row, headers, columnMapping, index + 2);
+          } catch (rowError) {
+            console.log(`⚠️ Erreur ligne ${index + 2}:`, rowError.message);
+            return null;
+          }
+        })
+        .filter(order => order !== null); // Filtrer les lignes invalides
+
+      console.log(`⚡ Transformation ultra-rapide terminée: ${orders.length} commandes valides`);
       
-      if (validOrders === 0) {
+      if (orders.length === 0) {
         console.log('⚠️ Aucune commande valide trouvée');
         console.log('💡 Vérifiez le format de vos données et les en-têtes de colonnes');
       }
@@ -345,7 +341,7 @@ class GoogleSheetsService {
       return orders;
 
     } catch (error) {
-      console.error('❌ Erreur lors de la transformation des données:', error);
+      console.error('❌ Erreur lors de la transformation ultra-rapide:', error);
       throw new Error(`Erreur lors de la transformation des données: ${error.message}`);
     }
   }
@@ -954,6 +950,124 @@ class GoogleSheetsService {
       
       // Retourner une erreur structurée
       throw new Error(`Échec de la synchronisation: ${error.message}`);
+    }
+  }
+
+  // Méthode de synchronisation ultra-rapide
+  async syncOrdersUltraFast(sheetData, config) {
+    try {
+      console.log(`⚡ Synchronisation ultra-rapide de ${sheetData.length} lignes...`);
+      
+      if (!sheetData || sheetData.length < 2) {
+        console.log('⚠️ Données insuffisantes pour la synchronisation');
+        return {
+          created: 0,
+          updated: 0,
+          total: 0,
+          message: 'Aucune donnée à synchroniser'
+        };
+      }
+
+      // 1. Transformation ultra-rapide des données
+      const startTransform = Date.now();
+      const orders = this.transformSheetDataToOrders(sheetData);
+      const transformTime = Date.now() - startTransform;
+      console.log(`⚡ Transformation terminée en ${transformTime}ms: ${orders.length} commandes`);
+
+      if (orders.length === 0) {
+        console.log('⚠️ Aucune commande valide trouvée');
+        return {
+          created: 0,
+          updated: 0,
+          total: 0,
+          message: 'Aucune commande valide à synchroniser'
+        };
+      }
+
+      // 2. Synchronisation ultra-rapide avec la base de données
+      const startSync = Date.now();
+      const syncResult = await this.syncOrdersToDatabaseUltraFast(orders);
+      const syncTime = Date.now() - startSync;
+      
+      console.log(`⚡ Synchronisation base de données terminée en ${syncTime}ms`);
+      console.log(`   Total temps: ${transformTime + syncTime}ms`);
+
+      return {
+        ...syncResult,
+        performance: {
+          transformTime,
+          syncTime,
+          totalTime: transformTime + syncTime
+        },
+        message: `Synchronisation ultra-rapide réussie en ${transformTime + syncTime}ms`
+      };
+
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation ultra-rapide:', error);
+      throw error;
+    }
+  }
+
+  // Méthode de synchronisation ultra-rapide avec la base de données
+  async syncOrdersToDatabaseUltraFast(orders) {
+    try {
+      console.log(`⚡ Synchronisation ultra-rapide de ${orders.length} commandes avec la base de données...`);
+      
+      const Order = require('../models/Order');
+      
+      // 1. Préparer les opérations en lot (bulk operations)
+      const bulkOps = [];
+      const updateOps = [];
+      
+      for (const order of orders) {
+        // Créer un identifiant unique pour la commande
+        const orderId = `${order.clientName}_${order.product}_${order.orderDate.getTime()}`;
+        
+        // Opération de mise à jour ou d'insertion (upsert)
+        bulkOps.push({
+          updateOne: {
+            filter: { 
+              clientName: order.clientName,
+              product: order.product,
+              orderDate: order.orderDate
+            },
+            update: { 
+              $set: {
+                ...order,
+                lastUpdated: new Date()
+              }
+            },
+            upsert: true
+          }
+        });
+      }
+
+      // 2. Exécuter toutes les opérations en une seule fois
+      const startBulk = Date.now();
+      const bulkResult = await Order.bulkWrite(bulkOps, { ordered: false });
+      const bulkTime = Date.now() - startBulk;
+      
+      console.log(`⚡ Opérations en lot terminées en ${bulkTime}ms`);
+      console.log(`   Commandes mises à jour: ${bulkResult.modifiedCount}`);
+      console.log(`   Nouvelles commandes: ${bulkResult.upsertedCount}`);
+
+      // 3. Statistiques finales
+      const totalOrders = await Order.countDocuments();
+      
+      return {
+        created: bulkResult.upsertedCount,
+        updated: bulkResult.modifiedCount,
+        total: orders.length,
+        totalInDatabase: totalOrders,
+        performance: {
+          bulkTime,
+          totalTime: bulkTime
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ Erreur lors de la synchronisation ultra-rapide avec la base de données:', error);
+      throw error;
     }
   }
 }
