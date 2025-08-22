@@ -55,29 +55,42 @@ class GoogleSheetsService {
 
   async loadActiveConfig() {
     try {
+      console.log('📋 Chargement de la configuration active...');
+      
       // Essayer de charger la configuration active depuis la base de données
       const activeConfig = await GoogleSheetsConfig.findOne({ isActive: true });
       
       if (activeConfig) {
         this.currentConfig = activeConfig;
-        console.log(`Configuration active chargée: ${activeConfig.name} (${activeConfig.spreadsheetId})`);
+        console.log(`✅ Configuration active chargée: ${activeConfig.name} (${activeConfig.spreadsheetId})`);
+        return activeConfig;
       } else {
+        console.log('⚠️ Aucune configuration active trouvée en base, utilisation du fallback...');
+        
         // Fallback sur les variables d'environnement
-        this.currentConfig = {
+        const fallbackConfig = {
           spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "128tqEErdDvs7cWwtSbRl69aRj2cHaBFlebPBDjHmDQ",
           sheetName: process.env.GOOGLE_SHEETS_SHEET_NAME || 'Feuille 1',
-          name: 'Configuration par défaut'
+          name: 'Configuration par défaut (fallback)'
         };
-        console.log('Utilisation de la configuration par défaut depuis .env');
+        
+        this.currentConfig = fallbackConfig;
+        console.log(`✅ Configuration de fallback utilisée: ${fallbackConfig.name} (${fallbackConfig.spreadsheetId})`);
+        return fallbackConfig;
       }
     } catch (error) {
-      console.error('Erreur lors du chargement de la configuration:', error);
-      // Fallback sur les variables d'environnement
-      this.currentConfig = {
+      console.error('❌ Erreur lors du chargement de la configuration:', error);
+      
+      // Fallback sur les variables d'environnement en cas d'erreur
+      const fallbackConfig = {
         spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "128tqEErdDvs7cWwtSbRl69aRj2cHaBFlebPBDjHmDQ",
         sheetName: process.env.GOOGLE_SHEETS_SHEET_NAME || 'Feuille 1',
-        name: 'Configuration par défaut'
+        name: 'Configuration par défaut (erreur fallback)'
       };
+      
+      this.currentConfig = fallbackConfig;
+      console.log(`✅ Configuration de fallback utilisée après erreur: ${fallbackConfig.name} (${fallbackConfig.spreadsheetId})`);
+      return fallbackConfig;
     }
   }
 
@@ -395,15 +408,54 @@ class GoogleSheetsService {
   // Méthode pour forcer la synchronisation manuelle
   async forceSyncOrders() {
     try {
-      const config = await this.getCurrentConfig();
-      if (!config) {
-        throw new Error('Aucune configuration active');
+      console.log('🔄 Début de la synchronisation manuelle...');
+      
+      // S'assurer que le service est initialisé
+      if (!this.isInitialized || !this.sheets) {
+        console.log('⚠️ Service non initialisé, initialisation en cours...');
+        await this.initialize();
       }
       
-      return await this.syncOrdersFromNewSheet(config);
+      // Récupérer la configuration active
+      console.log('📋 Récupération de la configuration active...');
+      const config = await this.getCurrentConfig();
+      
+      if (!config) {
+        throw new Error('Aucune configuration active trouvée');
+      }
+      
+      console.log(`✅ Configuration active trouvée: ${config.name} (${config.spreadsheetId})`);
+      
+      // Vérifier que la configuration a les données nécessaires
+      if (!config.spreadsheetId || !config.sheetName) {
+        throw new Error('Configuration incomplète: spreadsheetId ou sheetName manquant');
+      }
+      
+      // Tester l'accès avant la synchronisation
+      console.log('🔍 Test d\'accès au spreadsheet...');
+      await this.testAccess(config.spreadsheetId, config.sheetName);
+      console.log('✅ Accès au spreadsheet confirmé');
+      
+      // Lancer la synchronisation
+      console.log('🔄 Lancement de la synchronisation...');
+      const result = await this.syncOrdersFromNewSheet(config);
+      
+      console.log('✅ Synchronisation manuelle terminée avec succès');
+      return result;
+      
     } catch (error) {
-      console.error('Erreur lors de la synchronisation forcée:', error);
-      throw error;
+      console.error('❌ Erreur lors de la synchronisation forcée:', {
+        message: error.message,
+        stack: error.stack,
+        config: this.currentConfig ? {
+          name: this.currentConfig.name,
+          spreadsheetId: this.currentConfig.spreadsheetId,
+          sheetName: this.currentConfig.sheetName
+        } : 'Aucune configuration'
+      });
+      
+      // Retourner une erreur structurée
+      throw new Error(`Échec de la synchronisation: ${error.message}`);
     }
   }
 }

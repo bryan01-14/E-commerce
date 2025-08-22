@@ -8,7 +8,8 @@
     "dev": "nodemon index.js",
     "migrate:google-sheets": "node migrations/initGoogleSheetsConfig.js",
     "test:google-sheets": "node test-google-sheets-config.js",
-    "test:sync": "node test-sync.js"
+    "test:sync": "node test-sync.js",
+    "diagnose:sync": "node diagnose-sync.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -207,7 +207,34 @@ const GoogleSheetsConfig = () => {
       }
     } catch (error) {
       console.error('Erreur synchronisation manuelle:', error);
-      toast.error(error.response?.data?.error || 'Erreur lors de la synchronisation');
+      
+      // Afficher un message d'erreur plus informatif
+      let errorMessage = 'Erreur lors de la synchronisation';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Suggestions selon le type d'erreur
+      if (errorMessage.includes('Aucune configuration active')) {
+        errorMessage += '. Créez d\'abord une configuration Google Sheets.';
+      } else if (errorMessage.includes('Accès refusé')) {
+        errorMessage += '. Vérifiez les permissions du compte de service.';
+      } else if (errorMessage.includes('Configuration incomplète')) {
+        errorMessage += '. Vérifiez que tous les champs sont remplis.';
+      }
+      
+      toast.error(errorMessage, { duration: 8000 });
+      
+      // Afficher des suggestions d'aide
+      if (error.response?.status === 500) {
+        toast.error(
+          'Erreur serveur. Vérifiez la console pour plus de détails.',
+          { duration: 5000 }
+        );
+      }
     } finally {
       setLoading(false);
       setSyncStatus(null);

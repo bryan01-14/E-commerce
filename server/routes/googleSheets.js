@@ -205,18 +205,43 @@ router.post('/config/test', authenticate, requireRole(['admin']), async (req, re
 // Route POST pour forcer la synchronisation des commandes
 router.post('/sync-orders', authenticate, requireRole(['admin']), async (req, res) => {
   try {
+    console.log('🔄 Synchronisation manuelle demandée par:', req.user.username);
+    
+    // Vérifier que le service est disponible
+    if (!sheetsService) {
+      console.error('❌ Service Google Sheets non disponible');
+      return res.status(500).json({
+        success: false,
+        error: 'Service Google Sheets non disponible'
+      });
+    }
+    
+    // Lancer la synchronisation
     const syncResult = await sheetsService.forceSyncOrders();
+    
+    console.log('✅ Synchronisation manuelle réussie:', syncResult);
     
     res.json({
       success: true,
       message: "Synchronisation des commandes terminée",
       syncResult
     });
+    
   } catch (error) {
-    console.error("Erreur synchronisation commandes:", error);
+    console.error('❌ Erreur lors de la synchronisation manuelle:', {
+      message: error.message,
+      stack: error.stack,
+      user: req.user?.username
+    });
+    
+    // Retourner une erreur structurée
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Erreur lors de la synchronisation',
+      details: process.env.NODE_ENV === 'development' ? {
+        stack: error.stack,
+        type: error.constructor.name
+      } : undefined
     });
   }
 });
