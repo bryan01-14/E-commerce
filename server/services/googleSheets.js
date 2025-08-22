@@ -137,7 +137,7 @@ class GoogleSheetsService {
 
   async setActiveConfig(configId) {
     try {
-      console.log(`🔄 Changement de configuration active vers: ${configId}`);
+      console.log(`🔄 Activation de la configuration: ${configId}`);
       
       // Désactiver toutes les configurations
       await GoogleSheetsConfig.updateMany({}, { isActive: false });
@@ -145,10 +145,7 @@ class GoogleSheetsService {
       // Activer la configuration sélectionnée
       const config = await GoogleSheetsConfig.findByIdAndUpdate(
         configId,
-        { 
-          isActive: true,
-          lastUsed: new Date()
-        },
+        { isActive: true, lastUsed: new Date() },
         { new: true }
       );
       
@@ -156,21 +153,66 @@ class GoogleSheetsService {
         throw new Error('Configuration non trouvée');
       }
       
-      this.currentConfig = config;
-      console.log(`✅ Configuration active changée vers: ${config.name}`);
+      console.log(`✅ Configuration activée: ${config.name}`);
+      console.log(`   Spreadsheet ID: ${config.spreadsheetId}`);
+      console.log(`   Nom de feuille: "${config.sheetName}"`);
       
-      // Synchroniser automatiquement les commandes de la nouvelle feuille
+      // Vérifier automatiquement l'accès à la nouvelle feuille
+      console.log('🔍 Vérification automatique de l\'accès à la nouvelle feuille...');
       try {
+        const accessResult = await this.testAccess(config.spreadsheetId, config.sheetName);
+        console.log('✅ Accès à la nouvelle feuille vérifié avec succès');
+        console.log(`   Titre du spreadsheet: ${accessResult.spreadsheetTitle}`);
+        console.log(`   Feuilles disponibles: ${accessResult.availableSheets.join(', ')}`);
+        console.log(`   Feuille configurée existe: ${accessResult.sheetExists ? 'OUI' : 'NON'}`);
+        
+        if (!accessResult.sheetExists) {
+          console.log('⚠️ ATTENTION: La feuille configurée n\'existe pas !');
+          console.log(`   Feuille configurée: "${config.sheetName}"`);
+          console.log(`   Feuilles disponibles: ${accessResult.availableSheets.join(', ')}`);
+          
+          // Suggérer des corrections automatiques
+          if (accessResult.availableSheets.length > 0) {
+            console.log('💡 Suggestion: Utilisez une des feuilles disponibles');
+            console.log('   Feuilles suggérées:', accessResult.availableSheets.join(', '));
+          }
+        }
+        
+        // Synchroniser automatiquement les données de la nouvelle feuille
+        console.log('🔄 Synchronisation automatique des données de la nouvelle feuille...');
         const syncResult = await this.syncOrdersFromNewSheet(config);
-        console.log('✅ Synchronisation automatique terminée:', syncResult);
-        return { success: true, config, syncResult };
-      } catch (syncError) {
-        console.error('⚠️ Erreur lors de la synchronisation automatique:', syncError.message);
-        return { success: true, config, syncError: syncError.message };
+        console.log('✅ Synchronisation automatique réussie');
+        console.log(`   Nouvelles commandes: ${syncResult.created}`);
+        console.log(`   Commandes mises à jour: ${syncResult.updated}`);
+        console.log(`   Total traité: ${syncResult.total}`);
+        
+        return {
+          success: true,
+          config,
+          accessResult,
+          syncResult,
+          message: 'Configuration activée et synchronisée avec succès'
+        };
+        
+      } catch (accessError) {
+        console.error('❌ Erreur lors de la vérification de l\'accès:', accessError.message);
+        
+        // Retourner des informations détaillées pour l'interface
+        return {
+          success: false,
+          config,
+          error: accessError.message,
+          message: 'Configuration activée mais erreur d\'accès à la feuille',
+          suggestions: [
+            'Vérifiez que le nom de la feuille est correct',
+            'Vérifiez que la feuille existe dans le spreadsheet',
+            'Vérifiez les permissions du compte de service'
+          ]
+        };
       }
       
     } catch (error) {
-      console.error('❌ Erreur lors du changement de configuration:', error);
+      console.error('❌ Erreur lors de l\'activation de la configuration:', error);
       throw error;
     }
   }
@@ -368,118 +410,185 @@ class GoogleSheetsService {
 
   async getData(spreadsheetId = null, sheetName = null) {
     try {
-      // S'assurer que le service est initialisé
-      if (!this.isInitialized || !this.sheets) {
-        console.log('⚠️ Service non initialisé, initialisation en cours...');
+      if (!this.isInitialized) {
         await this.initialize();
       }
 
       const config = await this.getCurrentConfig();
+      if (!config) {
+        throw new Error('Aucune configuration active trouvée');
+      }
+
       const targetSpreadsheetId = spreadsheetId || config.spreadsheetId;
       const targetSheetName = sheetName || config.sheetName;
-      
+
+      console.log(`📖 Lecture des données depuis: ${targetSpreadsheetId}`);
+      console.log(`📋 Feuille cible: "${targetSheetName}"`);
+
       // Vérifier d'abord que la feuille existe
       console.log(`🔍 Vérification de l'existence de la feuille: "${targetSheetName}"`);
-      
       try {
         const sheetsResponse = await this.sheets.spreadsheets.get({
           spreadsheetId: targetSpreadsheetId,
-          fields: 'sheets.properties'
+          fields: 'sheets.properties.title'
         });
         
         const availableSheets = sheetsResponse.data.sheets.map(s => s.properties.title);
         console.log(`📋 Feuilles disponibles: ${availableSheets.join(', ')}`);
         
         if (!availableSheets.includes(targetSheetName)) {
-          throw new Error(`La feuille "${targetSheetName}" n'existe pas. Feuilles disponibles: ${availableSheets.join(', ')}`);
+          console.log(`❌ La feuille "${targetSheetName}" n'existe pas`);
+          console.log(`💡 Feuilles disponibles: ${availableSheets.join(', ')}`);
+          
+          // Suggérer des corrections
+          const similarSheets = availableSheets.filter(name =>
+            name.toLowerCase().includes(targetSheetName.toLowerCase()) ||
+            targetSheetName.toLowerCase().includes(name.toLowerCase())
+          );
+          
+          if (similarSheets.length > 0) {
+            console.log(`💡 Feuilles similaires trouvées: ${similarSheets.join(', ')}`);
+            throw new Error(`La feuille "${targetSheetName}" n'existe pas. Feuilles similaires: ${similarSheets.join(', ')}. Feuilles disponibles: ${availableSheets.join(', ')}`);
+          } else {
+            throw new Error(`La feuille "${targetSheetName}" n'existe pas. Feuilles disponibles: ${availableSheets.join(', ')}`);
+          }
         }
         
         console.log(`✅ Feuille "${targetSheetName}" trouvée`);
       } catch (error) {
         if (error.message.includes('n\'existe pas')) {
-          throw error;
+          throw error; // Re-throw specific error for client
         }
         console.log('⚠️ Impossible de vérifier l\'existence de la feuille, tentative de lecture directe...');
       }
-      
+
       // TOUJOURS utiliser des guillemets pour éviter les erreurs de parsing
       const quotedRange = `'${targetSheetName}'!A:Z`;
-      
-      console.log(`📖 Lecture des données: ${quotedRange} depuis ${targetSpreadsheetId}`);
-      console.log(`📋 Nom de feuille original: "${targetSheetName}"`);
-      console.log(`🔧 Nom de feuille avec guillemets: "${quotedRange}"`);
+      console.log(`🔍 Tentative de lecture avec le range: ${quotedRange}`);
 
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: targetSpreadsheetId,
-        range: quotedRange,
-      });
+      try {
+        const response = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: targetSpreadsheetId,
+          range: quotedRange
+        });
 
-      const data = response.data.values || [];
-      console.log(`✅ ${data.length} lignes récupérées`);
-      
-      return data;
-    } catch (error) {
-      console.error('❌ Erreur récupération données:', {
-        message: error.message,
-        code: error.code,
-        errors: error.errors
-      });
-      
-      // Si l'erreur persiste, essayer avec un range plus simple
-      if (error.message.includes('Unable to parse range') || error.message.includes('400')) {
-        console.log('🔄 Tentative avec range simplifié...');
-        try {
-          const config = await this.getCurrentConfig();
-          const targetSpreadsheetId = spreadsheetId || config.spreadsheetId;
-          const targetSheetName = sheetName || config.sheetName;
-          
-          // Essayer avec juste la première cellule
-          const simpleRange = `'${targetSheetName}'!A1`;
-          console.log(`🔄 Nouvelle tentative avec: ${simpleRange}`);
-          
-          const response = await this.sheets.spreadsheets.values.get({
-            spreadsheetId: targetSpreadsheetId,
-            range: simpleRange,
-          });
-
-          const data = response.data.values || [];
-          console.log(`✅ ${data.length} lignes récupérées avec range simplifié`);
-          
-          // Si ça marche, essayer le range complet
-          if (data.length > 0) {
-            console.log('🔄 Tentative avec range complet après test...');
-            const fullResponse = await this.sheets.spreadsheets.values.get({
-              spreadsheetId: targetSpreadsheetId,
-              range: `'${targetSheetName}'!A:Z`,
-            });
-            return fullResponse.data.values || [];
+        const data = response.data.values || [];
+        console.log(`✅ Lecture réussie: ${data.length} lignes`);
+        
+        if (data.length > 0) {
+          console.log(`📖 Première ligne (en-têtes): ${data[0].join(' | ')}`);
+          if (data.length > 1) {
+            console.log(`📖 Deuxième ligne (données): ${data[1].join(' | ')}`);
           }
-          
-          return data;
-        } catch (retryError) {
-          console.error('❌ Échec de la tentative avec range simplifié:', retryError.message);
         }
+
+        return data;
+
+      } catch (readError) {
+        console.log('⚠️ Erreur lors de la lecture avec le range complet:', readError.message);
+        
+        // Si l'erreur est "Unable to parse range", essayer avec une approche différente
+        if (readError.message.includes('Unable to parse range')) {
+          console.log('🔄 Tentative de récupération avec une approche alternative...');
+          
+          try {
+            // Essayer d'abord avec une seule cellule
+            const simpleRange = `'${targetSheetName}'!A1`;
+            console.log(`🔍 Test avec le range simple: ${simpleRange}`);
+            
+            const simpleResponse = await this.sheets.spreadsheets.values.get({
+              spreadsheetId: targetSpreadsheetId,
+              range: simpleRange
+            });
+            
+            console.log('✅ Lecture avec range simple réussie');
+            
+            // Maintenant essayer de lire plus de données
+            const extendedRange = `'${targetSheetName}'!A:Z`;
+            console.log(`🔍 Tentative de lecture étendue: ${extendedRange}`);
+            
+            const extendedResponse = await this.sheets.spreadsheets.values.get({
+              spreadsheetId: targetSpreadsheetId,
+              range: extendedRange
+            });
+            
+            const data = extendedResponse.data.values || [];
+            console.log(`✅ Lecture étendue réussie: ${data.length} lignes`);
+            return data;
+            
+          } catch (retryError) {
+            console.log('❌ Échec de la récupération alternative:', retryError.message);
+            
+            // Fournir des informations détaillées sur l'erreur
+            throw new Error(`Impossible de lire la feuille "${targetSheetName}". Erreur: ${retryError.message}. Vérifiez le nom de la feuille et les permissions.`);
+          }
+        }
+        
+        // Si ce n'est pas une erreur de parsing, re-throw l'erreur originale
+        throw readError;
+      }
+
+    } catch (error) {
+      console.error('❌ Erreur lors de la lecture des données:', error.message);
+      
+      // Améliorer les messages d'erreur pour l'interface
+      let userFriendlyError = error.message;
+      let suggestions = [];
+      
+      if (error.message.includes('n\'existe pas')) {
+        userFriendlyError = 'La feuille configurée n\'existe pas';
+        suggestions = [
+          'Vérifiez le nom exact de la feuille dans Google Sheets',
+          'Utilisez une des feuilles disponibles',
+          'Ou créez une nouvelle feuille avec le nom configuré'
+        ];
+      } else if (error.message.includes('Unable to parse range')) {
+        userFriendlyError = 'Erreur de format du nom de feuille';
+        suggestions = [
+          'Vérifiez que le nom de la feuille est correct',
+          'Évitez les caractères spéciaux dans le nom',
+          'Utilisez des noms simples'
+        ];
+      } else if (error.message.includes('Impossible de lire')) {
+        userFriendlyError = 'Impossible de lire la feuille';
+        suggestions = [
+          'Vérifiez que la feuille contient des données',
+          'Vérifiez les permissions du compte de service',
+          'Vérifiez que la feuille n\'est pas protégée'
+        ];
+      } else if (error.message.includes('Accès refusé')) {
+        userFriendlyError = 'Accès refusé au Google Sheet';
+        suggestions = [
+          'Vérifiez que le compte de service a accès au spreadsheet',
+          'Partagez le spreadsheet avec l\'email du compte de service',
+          'Donnez les permissions "Éditeur" au compte de service'
+        ];
       }
       
-      throw error;
+      throw {
+        success: false,
+        error: userFriendlyError,
+        originalError: error.message,
+        suggestions,
+        message: 'Erreur lors de la lecture des données'
+      };
     }
   }
 
   // Méthode pour tester l'accès avec gestion robuste des noms de feuilles
   async testAccess(spreadsheetId = null, sheetName = null) {
     try {
-      // S'assurer que le service est initialisé
-      if (!this.isInitialized || !this.sheets) {
-        console.log('⚠️ Service non initialisé, initialisation en cours...');
+      if (!this.isInitialized) {
         await this.initialize();
       }
 
-      const testSpreadsheetId = spreadsheetId || this.currentConfig?.spreadsheetId;
-      const testSheetName = sheetName || this.currentConfig?.sheetName;
-      
-      if (!testSpreadsheetId) {
-        throw new Error('Aucun ID de spreadsheet spécifié');
+      const config = await this.getCurrentConfig();
+      if (!config) {
+        throw new Error('Aucune configuration active trouvée');
       }
+
+      const testSpreadsheetId = spreadsheetId || config.spreadsheetId;
+      const testSheetName = sheetName || config.sheetName;
 
       console.log(`🔍 Test d'accès au spreadsheet: ${testSpreadsheetId}`);
       console.log(`📋 Nom de feuille testé: "${testSheetName}"`);
@@ -487,33 +596,37 @@ class GoogleSheetsService {
       // 1. Tester l'accès au spreadsheet
       const response = await this.sheets.spreadsheets.get({
         spreadsheetId: testSpreadsheetId,
-        fields: 'properties.title,sheets.properties'
+        fields: 'properties.title,sheets.properties.title'
       });
-      
+
+      const spreadsheetTitle = response.data.properties.title;
       const availableSheets = response.data.sheets.map(s => s.properties.title);
-      const sheetExists = testSheetName ? availableSheets.includes(testSheetName) : true;
-      
-      console.log(`✅ Accès réussi au spreadsheet: ${response.data.properties.title}`);
-      console.log(`   Feuilles disponibles: ${availableSheets.join(', ')}`);
-      console.log(`   Feuille testée existe: ${sheetExists}`);
-      
+      const sheetExists = availableSheets.includes(testSheetName);
+
+      console.log(`✅ Accès au spreadsheet réussi: ${spreadsheetTitle}`);
+      console.log(`📋 Feuilles disponibles: ${availableSheets.join(', ')}`);
+      console.log(`🔍 Feuille testée: "${testSheetName}"`);
+      console.log(`✅ Feuille existe: ${sheetExists ? 'OUI' : 'NON'}`);
+
       // 2. Vérifier si la feuille testée peut être lue
       if (testSheetName && sheetExists) {
         try {
-          // TOUJOURS utiliser des guillemets pour le test
+          // Test avec une cellule simple d'abord
           const testRange = `'${testSheetName}'!A1`;
-          console.log(`🔍 Test de lecture de la feuille: ${testRange}`);
+          console.log(`🔍 Test de lecture avec le range: ${testRange}`);
           
-          await this.sheets.spreadsheets.values.get({
+          const testResponse = await this.sheets.spreadsheets.values.get({
             spreadsheetId: testSpreadsheetId,
-            range: testRange,
+            range: testRange
           });
-          
-          console.log('✅ Lecture de la feuille réussie');
+
+          console.log(`✅ Lecture de la feuille réussie`);
+          if (testResponse.data.values && testResponse.data.values.length > 0) {
+            console.log(`📖 Première cellule (A1): "${testResponse.data.values[0][0]}"`);
+          }
         } catch (readError) {
           console.log('⚠️ Erreur lors de la lecture de la feuille:', readError.message);
           
-          // Si l'erreur persiste, essayer de diagnostiquer le problème
           if (readError.message.includes('Unable to parse range')) {
             console.log('🔍 Diagnostic du problème de parsing...');
             console.log(`   Nom de feuille original: "${testSheetName}"`);
@@ -522,8 +635,8 @@ class GoogleSheetsService {
             console.log(`   Caractères spéciaux détectés: ${/[^\w\s]/.test(testSheetName) ? 'OUI' : 'NON'}`);
             console.log(`   Feuilles disponibles: ${availableSheets.join(', ')}`);
             
-            // Suggérer des noms similaires
-            const similarSheets = availableSheets.filter(name => 
+            // Trouver des feuilles similaires
+            const similarSheets = availableSheets.filter(name =>
               name.toLowerCase().includes(testSheetName.toLowerCase()) ||
               testSheetName.toLowerCase().includes(name.toLowerCase())
             );
@@ -531,28 +644,83 @@ class GoogleSheetsService {
             if (similarSheets.length > 0) {
               console.log(`   💡 Feuilles similaires trouvées: ${similarSheets.join(', ')}`);
             }
+            
+            throw new Error(`Impossible de lire la feuille "${testSheetName}". Vérifiez le nom et les permissions. Feuilles disponibles: ${availableSheets.join(', ')}`);
           }
           
           throw new Error(`Impossible de lire la feuille "${testSheetName}". Vérifiez le nom et les permissions. Feuilles disponibles: ${availableSheets.join(', ')}`);
         }
       } else if (testSheetName && !sheetExists) {
+        console.log(`❌ La feuille "${testSheetName}" n'existe pas dans le spreadsheet`);
+        console.log(`💡 Feuilles disponibles: ${availableSheets.join(', ')}`);
+        
+        // Suggérer des corrections
+        const similarSheets = availableSheets.filter(name =>
+          name.toLowerCase().includes(testSheetName.toLowerCase()) ||
+          testSheetName.toLowerCase().includes(name.toLowerCase())
+        );
+        
+        if (similarSheets.length > 0) {
+          console.log(`💡 Feuilles similaires trouvées: ${similarSheets.join(', ')}`);
+        }
+        
         throw new Error(`La feuille "${testSheetName}" n'existe pas dans le spreadsheet. Feuilles disponibles: ${availableSheets.join(', ')}`);
       }
-      
+
+      // 3. Retourner le résultat complet
       return {
         success: true,
-        spreadsheetTitle: response.data.properties.title,
+        spreadsheetTitle,
         availableSheets,
         sheetExists,
-        currentSheet: testSheetName
+        testedSheet: testSheetName,
+        message: `Accès réussi au spreadsheet "${spreadsheetTitle}"`
       };
+
     } catch (error) {
-      console.error('❌ Erreur vérification accès:', error.message);
-      throw new Error(`Accès refusé au Google Sheet. Vérifiez: 
-        1. L'ID du spreadsheet
-        2. Le compte de service a bien accès
-        3. La feuille existe dans le document
-        4. Le nom de la feuille est correct (même avec espaces et caractères spéciaux)`);
+      console.error('❌ Erreur lors du test d\'accès:', error.message);
+      
+      // Améliorer les messages d'erreur pour l'interface
+      let userFriendlyError = error.message;
+      let suggestions = [];
+      
+      if (error.message.includes('Accès refusé')) {
+        userFriendlyError = 'Accès refusé au Google Sheet';
+        suggestions = [
+          'Vérifiez que le compte de service a accès au spreadsheet',
+          'Partagez le spreadsheet avec l\'email du compte de service',
+          'Donnez les permissions "Éditeur" au compte de service'
+        ];
+      } else if (error.message.includes('n\'existe pas')) {
+        userFriendlyError = 'La feuille configurée n\'existe pas';
+        suggestions = [
+          'Vérifiez le nom exact de la feuille dans Google Sheets',
+          'Utilisez une des feuilles disponibles',
+          'Ou créez une nouvelle feuille avec le nom configuré'
+        ];
+      } else if (error.message.includes('Unable to parse range')) {
+        userFriendlyError = 'Erreur de format du nom de feuille';
+        suggestions = [
+          'Vérifiez que le nom de la feuille est correct',
+          'Évitez les caractères spéciaux dans le nom',
+          'Utilisez des noms simples'
+        ];
+      } else if (error.message.includes('Impossible de lire')) {
+        userFriendlyError = 'Impossible de lire la feuille';
+        suggestions = [
+          'Vérifiez que la feuille contient des données',
+          'Vérifiez les permissions du compte de service',
+          'Vérifiez que la feuille n\'est pas protégée'
+        ];
+      }
+      
+      throw {
+        success: false,
+        error: userFriendlyError,
+        originalError: error.message,
+        suggestions,
+        message: 'Erreur lors du test d\'accès'
+      };
     }
   }
 

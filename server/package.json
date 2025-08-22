@@ -15,7 +15,8 @@
     "validate:sheets": "node validate-sheet-names.js",
     "test:any-sheet": "node test-any-sheet.js",
     "diagnose:sheet": "node diagnose-sheet-issue.js",
-    "check:permissions": "node check-permissions.js"
+    "check:permissions": "node check-permissions.js",
+    "test:universal": "node test-universal-sheets.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
