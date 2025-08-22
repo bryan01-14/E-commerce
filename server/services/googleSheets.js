@@ -178,20 +178,43 @@ class GoogleSheetsService {
           }
         }
         
-        // Synchroniser automatiquement les données de la nouvelle feuille
-        console.log('🔄 Synchronisation automatique des données de la nouvelle feuille...');
+        // Synchroniser automatiquement TOUTES les données de la nouvelle feuille
+        console.log('🔄 Synchronisation complète des données de la nouvelle feuille...');
+        console.log('📊 Récupération de toutes les données pour mise à jour du total...');
+        
+        // 1. Récupérer toutes les données de la nouvelle feuille
+        const allData = await this.getData(config.spreadsheetId, config.sheetName);
+        console.log(`📋 Données récupérées: ${allData.length} lignes au total`);
+        
+        // 2. Synchroniser complètement avec la base de données
         const syncResult = await this.syncOrdersFromNewSheet(config);
-        console.log('✅ Synchronisation automatique réussie');
+        console.log('✅ Synchronisation complète réussie');
         console.log(`   Nouvelles commandes: ${syncResult.created}`);
         console.log(`   Commandes mises à jour: ${syncResult.updated}`);
         console.log(`   Total traité: ${syncResult.total}`);
+        
+        // 3. Vérifier le total final des commandes
+        const Order = require('../models/Order');
+        const totalOrders = await Order.countDocuments();
+        const activeOrders = await Order.countDocuments({ status: { $ne: 'livré' } });
+        const deliveredOrders = await Order.countDocuments({ status: 'livré' });
+        
+        console.log('📊 Statistiques finales après changement de feuille:');
+        console.log(`   Total des commandes: ${totalOrders}`);
+        console.log(`   Commandes actives: ${activeOrders}`);
+        console.log(`   Commandes livrées: ${deliveredOrders}`);
         
         return {
           success: true,
           config,
           accessResult,
           syncResult,
-          message: 'Configuration activée et synchronisée avec succès'
+          totalStats: {
+            total: totalOrders,
+            active: activeOrders,
+            delivered: deliveredOrders
+          },
+          message: 'Configuration activée et total des commandes mis à jour avec succès'
         };
         
       } catch (accessError) {
@@ -219,128 +242,210 @@ class GoogleSheetsService {
 
   async syncOrdersFromNewSheet(config) {
     try {
-      console.log(`🔄 Synchronisation des commandes depuis la nouvelle feuille: ${config.sheetName}`);
+      console.log(`🔄 Synchronisation complète depuis la nouvelle feuille: "${config.sheetName}"`);
       
-      // Vérifier que la configuration est valide
-      if (!config.spreadsheetId || !config.sheetName) {
-        throw new Error('Configuration invalide: spreadsheetId ou sheetName manquant');
-      }
-      
-      // Récupérer les données de la nouvelle feuille
+      // 1. Récupérer toutes les données de la nouvelle feuille
       const sheetData = await this.getData(config.spreadsheetId, config.sheetName);
+      console.log(`📋 Données récupérées de la feuille: ${sheetData.length} lignes`);
       
-      if (!sheetData || sheetData.length < 2) {
-        console.log('⚠️ Aucune donnée trouvée dans la nouvelle feuille');
-        return { success: false, message: 'Aucune donnée trouvée', created: 0, updated: 0, total: 0 };
-      }
-
-      // Transformer les données en commandes
-      const [headers, ...rows] = sheetData;
-      const orders = this.transformSheetDataToOrders(rows, headers, config);
-      
-      if (orders.length === 0) {
-        console.log('⚠️ Aucune commande valide trouvée dans les données');
-        return { success: false, message: 'Aucune commande valide', created: 0, updated: 0, total: 0 };
+      if (sheetData.length === 0) {
+        console.log('⚠️ Aucune donnée trouvée dans la feuille');
+        return {
+          created: 0,
+          updated: 0,
+          total: 0,
+          message: 'Aucune donnée à synchroniser'
+        };
       }
       
-      // Synchroniser avec la base de données
-      const syncResults = await this.syncOrdersToDatabase(orders, config);
+      // 2. Transformer les données en commandes
+      const orders = this.transformSheetDataToOrders(sheetData);
+      console.log(`🔄 Transformation en commandes: ${orders.length} commandes à traiter`);
       
-      console.log(`✅ Synchronisation terminée: ${syncResults.created} créées, ${syncResults.updated} mises à jour`);
+      // 3. Synchroniser complètement avec la base de données
+      const syncResult = await this.syncOrdersToDatabase(orders);
+      console.log('✅ Synchronisation complète réussie');
+      
+      // 4. Vérifier le total final
+      const Order = require('../models/Order');
+      const totalOrders = await Order.countDocuments();
+      const activeOrders = await Order.countDocuments({ status: { $ne: 'livré' } });
+      const deliveredOrders = await Order.countDocuments({ status: 'livré' });
+      
+      console.log('📊 Statistiques finales après synchronisation:');
+      console.log(`   Total des commandes: ${totalOrders}`);
+      console.log(`   Commandes actives: ${activeOrders}`);
+      console.log(`   Commandes livrées: ${deliveredOrders}`);
       
       return {
-        success: true,
-        created: syncResults.created,
-        updated: syncResults.updated,
-        total: orders.length
+        ...syncResult,
+        totalStats: {
+          total: totalOrders,
+          active: activeOrders,
+          delivered: deliveredOrders
+        },
+        message: `Synchronisation complète réussie. Total: ${totalOrders} commandes`
       };
       
     } catch (error) {
-      console.error('❌ Erreur lors de la synchronisation:', error);
+      console.error('❌ Erreur lors de la synchronisation depuis la nouvelle feuille:', error);
       throw error;
     }
   }
 
-  transformSheetDataToOrders(rows, headers, config) {
+  transformSheetDataToOrders(sheetData) {
     try {
-      console.log(`🔄 Transformation de ${rows.length} lignes avec ${headers.length} colonnes`);
-      
-      return rows.map((row, index) => {
-        const orderData = {};
-        
-        headers.forEach((header, colIndex) => {
-          const value = row[colIndex] || '';
-          
-          // Mapping des colonnes selon votre structure
-          switch (header.toLowerCase()) {
-            case 'n° commande':
-            case 'numero commande':
-            case 'id':
-            case 'commande':
-              orderData.numeroCommande = value;
-              break;
-            case 'date':
-            case 'date commande':
-            case 'date_commande':
-              try {
-                orderData.dateCommande = new Date(value);
-              } catch (dateError) {
-                orderData.dateCommande = new Date();
-              }
-              break;
-            case 'client':
-            case 'nom client':
-            case 'client_nom':
-              orderData.clientNom = value;
-              break;
-            case 'téléphone':
-            case 'telephone':
-            case 'client_telephone':
-              orderData.clientTelephone = value;
-              break;
-            case 'adresse':
-            case 'adresse livraison':
-            case 'adresse_livraison':
-              orderData.adresseLivraison = value;
-              break;
-            case 'produit':
-            case 'produits':
-              orderData.produits = [{ nom: value, quantite: 1, prix: 0 }];
-              break;
-            case 'quantité':
-            case 'qte':
-            case 'quantite':
-              if (orderData.produits && orderData.produits[0]) {
-                orderData.produits[0].quantite = parseInt(value) || 1;
-              }
-              break;
-            case 'prix':
-              if (orderData.produits && orderData.produits[0]) {
-                orderData.produits[0].prix = parseFloat(value) || 0;
-              }
-              break;
-            case 'boutique':
-              orderData.boutique = value;
-              break;
-            case 'statut':
-            case 'status':
-              orderData.status = value.toLowerCase() === 'en attente' ? 'en_attente' : 'en_attente';
-              break;
-          }
-        });
+      if (!sheetData || sheetData.length < 2) {
+        console.log('⚠️ Données insuffisantes pour la transformation');
+        return [];
+      }
 
-        // Ajouter des valeurs par défaut
-        orderData.googleSheetsId = `${config.spreadsheetId}_${config.sheetName}_${index}`;
-        orderData.status = orderData.status || 'en_attente';
-        orderData.boutique = orderData.boutique || 'Boutique principale';
-        orderData.dateCommande = orderData.dateCommande || new Date();
+      const [headers, ...rows] = sheetData;
+      console.log(`📋 En-têtes détectés: ${headers.join(', ')}`);
+      console.log(`📊 Lignes de données à traiter: ${rows.length}`);
+
+      // Mapping intelligent des colonnes
+      const columnMapping = this.detectColumnMapping(headers);
+      console.log('🔍 Mapping des colonnes détecté:', columnMapping);
+
+      const orders = [];
+      let validOrders = 0;
+      let skippedRows = 0;
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
         
-        return orderData;
-      }).filter(order => order.numeroCommande && order.clientNom); // Filtrer les lignes valides
+        // Ignorer les lignes vides
+        if (!row || row.every(cell => !cell || cell.toString().trim() === '')) {
+          skippedRows++;
+          continue;
+        }
+
+        try {
+          const order = this.createOrderFromRow(row, headers, columnMapping, i + 2); // +2 car on commence à la ligne 2 (après les en-têtes)
+          if (order) {
+            orders.push(order);
+            validOrders++;
+          } else {
+            skippedRows++;
+          }
+        } catch (rowError) {
+          console.log(`⚠️ Erreur lors du traitement de la ligne ${i + 2}:`, rowError.message);
+          skippedRows++;
+        }
+      }
+
+      console.log(`✅ Transformation terminée: ${validOrders} commandes valides, ${skippedRows} lignes ignorées`);
       
+      if (validOrders === 0) {
+        console.log('⚠️ Aucune commande valide trouvée');
+        console.log('💡 Vérifiez le format de vos données et les en-têtes de colonnes');
+      }
+
+      return orders;
+
     } catch (error) {
       console.error('❌ Erreur lors de la transformation des données:', error);
-      return [];
+      throw new Error(`Erreur lors de la transformation des données: ${error.message}`);
+    }
+  }
+
+  detectColumnMapping(headers) {
+    const mapping = {};
+    
+    headers.forEach((header, index) => {
+      const headerLower = header.toString().toLowerCase().trim();
+      
+      // Mapping intelligent des colonnes
+      if (headerLower.includes('nom') || headerLower.includes('client') || headerLower.includes('name')) {
+        mapping.clientName = index;
+      } else if (headerLower.includes('adresse') || headerLower.includes('address')) {
+        mapping.address = index;
+      } else if (headerLower.includes('téléphone') || headerLower.includes('phone') || headerLower.includes('tel')) {
+        mapping.phone = index;
+      } else if (headerLower.includes('produit') || headerLower.includes('product') || headerLower.includes('article')) {
+        mapping.product = index;
+      } else if (headerLower.includes('quantité') || headerLower.includes('quantity') || headerLower.includes('qte')) {
+        mapping.quantity = index;
+      } else if (headerLower.includes('prix') || headerLower.includes('price') || headerLower.includes('montant')) {
+        mapping.price = index;
+      } else if (headerLower.includes('date') || headerLower.includes('date commande')) {
+        mapping.orderDate = index;
+      } else if (headerLower.includes('statut') || headerLower.includes('status') || headerLower.includes('état')) {
+        mapping.status = index;
+      } else if (headerLower.includes('livreur') || headerLower.includes('delivery') || headerLower.includes('driver')) {
+        mapping.deliveryPerson = index;
+      }
+    });
+
+    console.log('🔍 Colonnes mappées:', mapping);
+    return mapping;
+  }
+
+  createOrderFromRow(row, headers, columnMapping, rowNumber) {
+    try {
+      // Vérifier que la ligne contient des données essentielles
+      const hasClientName = columnMapping.clientName !== undefined && row[columnMapping.clientName];
+      const hasProduct = columnMapping.product !== undefined && row[columnMapping.product];
+      
+      if (!hasClientName || !hasProduct) {
+        console.log(`⚠️ Ligne ${rowNumber} ignorée: données essentielles manquantes`);
+        return null;
+      }
+
+      // Créer l'objet commande
+      const order = {
+        clientName: row[columnMapping.clientName] || 'Client inconnu',
+        address: row[columnMapping.address] || 'Adresse non spécifiée',
+        phone: row[columnMapping.phone] || 'Téléphone non spécifié',
+        product: row[columnMapping.product] || 'Produit non spécifié',
+        quantity: parseInt(row[columnMapping.quantity]) || 1,
+        price: parseFloat(row[columnMapping.price]) || 0,
+        orderDate: this.parseDate(row[columnMapping.orderDate]) || new Date(),
+        status: row[columnMapping.status] || 'en attente',
+        deliveryPerson: row[columnMapping.deliveryPerson] || null,
+        sourceSheet: 'Google Sheets',
+        lastUpdated: new Date()
+      };
+
+      // Validation des données
+      if (order.quantity <= 0) order.quantity = 1;
+      if (order.price < 0) order.price = 0;
+
+      return order;
+
+    } catch (error) {
+      console.log(`⚠️ Erreur lors de la création de la commande ligne ${rowNumber}:`, error.message);
+      return null;
+    }
+  }
+
+  parseDate(dateString) {
+    if (!dateString) return new Date();
+    
+    try {
+      // Essayer différents formats de date
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+      
+      // Format français DD/MM/YYYY
+      const frenchDate = dateString.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (frenchDate) {
+        return new Date(frenchDate[3], frenchDate[2] - 1, frenchDate[1]);
+      }
+      
+      // Format américain MM/DD/YYYY
+      const americanDate = dateString.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (americanDate) {
+        return new Date(americanDate[3], americanDate[1] - 1, americanDate[2]);
+      }
+      
+      return new Date();
+    } catch (error) {
+      console.log('⚠️ Erreur lors du parsing de la date:', dateString);
+      return new Date();
     }
   }
 

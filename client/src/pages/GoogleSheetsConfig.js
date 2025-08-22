@@ -28,7 +28,7 @@ const GoogleSheetsConfig = () => {
   const [formData, setFormData] = useState({
     name: '',
     spreadsheetId: '',
-    sheetName: 'Feuille 1',
+    sheetName: '',
     description: ''
   });
 
@@ -71,7 +71,7 @@ const GoogleSheetsConfig = () => {
     setFormData({
       name: '',
       spreadsheetId: '',
-      sheetName: 'Feuille 1',
+      sheetName: '',
       description: ''
     });
     setEditingConfig(null);
