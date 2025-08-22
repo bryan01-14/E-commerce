@@ -378,6 +378,30 @@ class GoogleSheetsService {
       const targetSpreadsheetId = spreadsheetId || config.spreadsheetId;
       const targetSheetName = sheetName || config.sheetName;
       
+      // Vérifier d'abord que la feuille existe
+      console.log(`🔍 Vérification de l'existence de la feuille: "${targetSheetName}"`);
+      
+      try {
+        const sheetsResponse = await this.sheets.spreadsheets.get({
+          spreadsheetId: targetSpreadsheetId,
+          fields: 'sheets.properties'
+        });
+        
+        const availableSheets = sheetsResponse.data.sheets.map(s => s.properties.title);
+        console.log(`📋 Feuilles disponibles: ${availableSheets.join(', ')}`);
+        
+        if (!availableSheets.includes(targetSheetName)) {
+          throw new Error(`La feuille "${targetSheetName}" n'existe pas. Feuilles disponibles: ${availableSheets.join(', ')}`);
+        }
+        
+        console.log(`✅ Feuille "${targetSheetName}" trouvée`);
+      } catch (error) {
+        if (error.message.includes('n\'existe pas')) {
+          throw error;
+        }
+        console.log('⚠️ Impossible de vérifier l\'existence de la feuille, tentative de lecture directe...');
+      }
+      
       // TOUJOURS utiliser des guillemets pour éviter les erreurs de parsing
       const quotedRange = `'${targetSheetName}'!A:Z`;
       
@@ -496,10 +520,23 @@ class GoogleSheetsService {
             console.log(`   Nom avec guillemets: '${testSheetName}'`);
             console.log(`   Longueur du nom: ${testSheetName.length}`);
             console.log(`   Caractères spéciaux détectés: ${/[^\w\s]/.test(testSheetName) ? 'OUI' : 'NON'}`);
+            console.log(`   Feuilles disponibles: ${availableSheets.join(', ')}`);
+            
+            // Suggérer des noms similaires
+            const similarSheets = availableSheets.filter(name => 
+              name.toLowerCase().includes(testSheetName.toLowerCase()) ||
+              testSheetName.toLowerCase().includes(name.toLowerCase())
+            );
+            
+            if (similarSheets.length > 0) {
+              console.log(`   💡 Feuilles similaires trouvées: ${similarSheets.join(', ')}`);
+            }
           }
           
-          throw new Error(`Impossible de lire la feuille "${testSheetName}". Vérifiez le nom et les permissions.`);
+          throw new Error(`Impossible de lire la feuille "${testSheetName}". Vérifiez le nom et les permissions. Feuilles disponibles: ${availableSheets.join(', ')}`);
         }
+      } else if (testSheetName && !sheetExists) {
+        throw new Error(`La feuille "${testSheetName}" n'existe pas dans le spreadsheet. Feuilles disponibles: ${availableSheets.join(', ')}`);
       }
       
       return {
