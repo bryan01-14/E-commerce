@@ -29,17 +29,17 @@ const Layout = () => {
     navigate('/login');
   };
 
-  const navigation = [
+  // Vérifier si user est défini avant d'accéder à ses propriétés
+  const navigation = user ? [
     { name: 'Tableau de bord', href: '/dashboard', icon: Home },
-    // { name: 'Commandes', href: '/orders', icon: Package },
-    ...(user?.role === 'livreur' ? [{ name: 'commande', href: '/orderlivreur', icon: Users }] : []),
-    ...(user?.role === 'admin' || user?.role === 'closeur'  ? [{ name: 'Attribuer Commandes', href: '/orders', icon: Package }] : []),
-    ...(user?.role === 'admin' ? [{ name: 'Utilisateurs', href: '/users', icon: Users }] : []),
-    ...(user?.role === 'admin' ? [{ name: 'Surveillance Activités', href: '/admin-activity', icon: Activity }] : []),
-    ...(user?.role === 'admin' ? [{ name: 'Total des commandes', href: '/google-sheets', icon: Database }] : []),
-    ...(user?.role === 'admin' ? [{ name: 'Config Google Sheets', href: '/google-sheets-config', icon: Settings }] : []),
+    ...(user.role === 'livreur' ? [{ name: 'commande', href: '/orderlivreur', icon: Users }] : []),
+    ...(user.role === 'admin' || user.role === 'closeur' ? [{ name: 'Attribuer Commandes', href: '/orders', icon: Package }] : []),
+    ...(user.role === 'admin' ? [{ name: 'Utilisateurs', href: '/users', icon: Users }] : []),
+    ...(user.role === 'admin' ? [{ name: 'Surveillance Activités', href: '/admin-activity', icon: Activity }] : []),
+    ...(user.role === 'admin' ? [{ name: 'Total des commandes', href: '/google-sheets', icon: Database }] : []),
+    ...(user.role === 'admin' ? [{ name: 'Config Google Sheets', href: '/google-sheets-config', icon: Settings }] : []),
     { name: 'Paramètres', href: '/settings', icon: Settings },
-  ];
+  ] : [];
 
   const getRoleLabel = (role) => {
     switch (role) {
@@ -140,7 +140,7 @@ const Layout = () => {
                 {connected ? (
                   <WifiOff className="h-4 w-4 text-danger-500" />
                 ) : (
-                  <Wifi className="h-4 w-4  text-success-500" />
+                  <WifiOff className="h-4 w-4  text-success-500" />
                 )}
                 <span className="text-xs text-gray-500">
                   {connected ? ' Déconnecté' : 'Connecté'}
@@ -156,29 +156,37 @@ const Layout = () => {
               {/* User menu */}
               <div className="relative">
                 <div className="flex items-center gap-x-3">
-                  <div className="hidden md:flex md:flex-col md:items-end md:leading-tight">
-                    <p className="text-sm font-medium text-gray-900">
-                      {user?.prenom} {user?.nom}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {getRoleLabel(user?.role)}
-                      {user?.boutique && ` - ${user.boutique}`}
-                    </p>
-                  </div>
-                  <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
-                    <User className="h-4 w-4 text-white" />
-                  </div>
+                  {user ? (
+                    <>
+                      <div className="hidden md:flex md:flex-col md:items-end md:leading-tight">
+                        <p className="text-sm font-medium text-gray-900">
+                          {user.prenom} {user.nom}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {getRoleLabel(user.role)}
+                          {user.boutique && ` - ${user.boutique}`}
+                        </p>
+                      </div>
+                      <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
+                        <User className="h-4 w-4 text-white" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-gray-500">Chargement...</div>
+                  )}
                 </div>
               </div>
 
               {/* Logout button */}
-              <button
-                onClick={handleLogout}
-                className="text-gray-400 hover:text-gray-500"
-                title="Se déconnecter"
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
+              {user && (
+                <button
+                  onClick={handleLogout}
+                  className="text-gray-400 hover:text-gray-500"
+                  title="Se déconnecter"
+                >
+                  <LogOut className="h-5 w-5" />
+                </button>
+              )}
             </div>
           </div>
         </div>

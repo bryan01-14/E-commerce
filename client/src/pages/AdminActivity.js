@@ -20,14 +20,15 @@ import {
   UserCheck,
   UserX,
   Award,
-  AlertCircle
+  AlertCircle,
+  XCircle as XCircleIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import api from '../api/axios';
 
 const AdminActivity = () => {
-  const { user } = useAuth();
+  const { user: currentUser } = useAuth(); // Renommer pour éviter la confusion
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState([]);
   const [users, setUsers] = useState([]);
@@ -116,7 +117,8 @@ const AdminActivity = () => {
     }
   };
 
-  if (!user || user.role !== 'admin') {
+  // Vérifier si currentUser est défini avant d'accéder à ses propriétés
+  if (!currentUser || currentUser.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
@@ -211,7 +213,7 @@ const AdminActivity = () => {
         </div>
 
         {/* Statistiques globales */}
-        <div className="grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        <div className="grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-col-4 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -440,10 +442,10 @@ const AdminActivity = () => {
                         <div className="flex items-center">
                           <div>
                             <div className="text-sm font-medium text-gray-900">
-                              {activity.user.prenom} {activity.user.nom}
+                              {activity.user?.prenom} {activity.user?.nom}
                             </div>
                             <div className="text-sm text-gray-500">
-                              {activity.user.role}
+                              {activity.user?.role}
                             </div>
                           </div>
                         </div>
@@ -486,7 +488,7 @@ const AdminActivity = () => {
                     onClick={() => setShowUserDetails(false)}
                     className="text-gray-400 hover:text-gray-600"
                   >
-                    <XCircle className="h-6 w-6" />
+                    <XCircleIcon className="h-6 w-6" />
                   </button>
                 </div>
 

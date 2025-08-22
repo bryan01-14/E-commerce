@@ -90,9 +90,15 @@ const Dashboard = () => {
         <h1 className="text-2xl font-bold text-gray-900">
           Tableau de bord
         </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Bienvenue, {user?.prenom} {user?.nom}
-        </p>
+        {user ? (
+          <p className="mt-1 text-sm text-gray-500">
+            Bienvenue, {user.prenom} {user.nom}
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-gray-500">
+            Bienvenue
+          </p>
+        )}
         
         {/* Configuration active */}
         {activeSheetConfig ? (
@@ -347,7 +353,7 @@ const Dashboard = () => {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Rôle:</span>
-                <span className="font-medium">{user?.role}</span>
+                <span className="font-medium">{user?.role || 'N/A'}</span>
               </div>
               {user?.boutique && (
                 <div className="flex justify-between">
