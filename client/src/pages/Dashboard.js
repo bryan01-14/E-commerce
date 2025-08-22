@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Package,
@@ -14,6 +15,7 @@ import { fr } from 'date-fns/locale';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -293,6 +295,77 @@ const Dashboard = () => {
               </table>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="card">
+          <div className="card-body">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Actions rapides
+            </h3>
+            <div className="space-y-3">
+              <button className="w-full btn-primary" onClick={() => navigate('/orders')}>
+                Voir toutes les commandes
+              </button>
+              {user?.role === 'admin' && (
+                <button className="w-full btn-secondary" onClick={() => navigate('/users')}>
+                  Gérer les utilisateurs
+                </button>
+              )}
+              <button className="w-full btn-secondary" onClick={() => navigate('/settings')}>
+                Paramètres
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Statistiques par statut
+            </h3>
+            <div className="space-y-3">
+              {stats?.statsByStatus?.map((stat) => (
+                <div key={stat._id} className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">{stat._id}</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {stat.count} ({((stat.count / stats.total) * 100).toFixed(1)}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Informations système
+            </h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Rôle:</span>
+                <span className="font-medium">{user?.role}</span>
+              </div>
+              {user?.boutique && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Boutique:</span>
+                  <span className="font-medium">{user.boutique}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-600">Dernière connexion:</span>
+                <span className="font-medium">
+                  {user?.derniereConnexion ? 
+                    format(new Date(user.derniereConnexion), 'dd/MM/yyyy HH:mm', { locale: fr }) :
+                    'N/A'
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
