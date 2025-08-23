@@ -1,5 +1,4 @@
-// contexts/AuthContext.js
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
@@ -16,74 +15,49 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('token'));
 
-  // L'instance API gère déjà baseURL, withCredentials et le token via intercepteur
-
-  const checkAuth = useCallback(async () => {
-    try {
-      // Ne pas appeler l'API s'il n'y a pas de token (évite un 401 au chargement)
-      const existingToken = localStorage.getItem('token');
-      if (!existingToken) {
-        setUser(null);
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        setLoading(false);
         return;
       }
 
-      // Vérifier d'abord avec le token
-      const response = await api.get('/auth/me');
-      
-      if (response.data.user) {
-        setUser(response.data.user);
-        if (response.data.token) {
-          const newToken = response.data.token;
-          setToken(newToken);
-          localStorage.setItem('token', newToken);
-        }
-      }
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Erreur vérification auth:', error);
-      }
-      
-      // Si erreur 401, tenter une récupération de session
-      if (error.response?.status === 401) {
-        try {
-          const sessionResponse = await api.get('/auth/session');
-          if (sessionResponse.data.userId) {
-            // Si session valide, relancer la vérification auth
-            await checkAuth();
-            return;
-          }
-        } catch (sessionError) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error('Session invalide:', sessionError);
-          }
-        }
+      try {
+        // Configurer le token dans les headers
+        api.defaults.headers.Authorization = `Bearer ${token}`;
         
-        // Nettoyer les données d'authentification invalides
-        setUser(null);
-        setToken(null);
+        const response = await api.get('/auth/me');
+        setUser(response.data.user);
+      } catch (error) {
+        console.error('Erreur vérification auth:', error);
+        
+        // Nettoyer en cas d'erreur
         localStorage.removeItem('token');
+        delete api.defaults.headers.Authorization;
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    };
 
-  useEffect(() => {
     checkAuth();
-  }, [checkAuth]);
+  }, []);
 
   const login = async (credentials) => {
     try {
       const response = await api.post('/auth/login', credentials);
       const { user, token } = response.data;
       
-      setUser(user);
-      setToken(token);
+      // Stocker le token
       localStorage.setItem('token', token);
+      api.defaults.headers.Authorization = `Bearer ${token}`;
       
+      setUser(user);
       toast.success('Connexion réussie');
+      
       return { success: true };
     } catch (error) {
       console.error('Erreur de connexion:', error);
@@ -99,9 +73,10 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Erreur lors de la déconnexion API:', error);
     } finally {
-      setUser(null);
-      setToken(null);
+      // Nettoyer quoi qu'il arrive
       localStorage.removeItem('token');
+      delete api.defaults.headers.Authorization;
+      setUser(null);
       toast.success('Déconnexion réussie');
     }
   };
@@ -109,10 +84,8 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     loading,
-    token,
     login,
     logout,
-    checkAuth,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
     isCloseur: user?.role === 'closeur',
