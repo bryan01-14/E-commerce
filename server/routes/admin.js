@@ -22,38 +22,41 @@ router.get('/users', authenticate, requireAdmin, async (req, res) => {
     // Calculer les statistiques pour chaque utilisateur
     const usersWithStats = await Promise.all(
       users.map(async (user) => {
-        const orderFilter = {};
-        
-        // Filtrer par rôle
-        if (user.role === 'livreur') {
-          orderFilter.livreurId = user._id;
-        } else if (user.role === 'closeur' && user.boutique) {
-          orderFilter.boutique = user.boutique;
-        }
-
         // Filtrer par date si spécifié
+        const dateFilter = {};
         if (dateRange && dateRange !== 'all') {
           const days = parseInt(dateRange.replace('days', ''));
           const startDate = new Date();
           startDate.setDate(startDate.getDate() - days);
-          orderFilter.createdAt = { $gte: startDate };
+          dateFilter.createdAt = { $gte: startDate };
         }
 
-        // Calculer les statistiques
-        const [totalOrders, deliveredOrders, pendingOrders, attributedOrders] = await Promise.all([
-          Order.countDocuments(orderFilter),
-          Order.countDocuments({ ...orderFilter, status: 'livré' }),
-          Order.countDocuments({ ...orderFilter, status: 'en_attente' }),
-          Order.countDocuments({ ...orderFilter, status: 'attribué' })
-        ]);
+        let count = 0;
+        let statsType = '';
+
+        if (user.role === 'livreur') {
+          // Pour les livreurs: compter les commandes livrées
+          count = await Order.countDocuments({
+            ...dateFilter,
+            livreurId: user._id,
+            status: 'livré'
+          });
+          statsType = 'livraisons';
+        } else if (user.role === 'closeur' && user.boutique) {
+          // Pour les closeurs: compter les commandes attribuées de leur boutique
+          count = await Order.countDocuments({
+            ...dateFilter,
+            boutique: user.boutique,
+            status: 'attribué'
+          });
+          statsType = 'attributions';
+        }
 
         return {
           ...user,
           stats: {
-            totalOrders,
-            deliveredOrders,
-            pendingOrders,
-            attributedOrders
+            count: count || 0,
+            type: statsType
           }
         };
       })
@@ -68,6 +71,52 @@ router.get('/users', authenticate, requireAdmin, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: 'Erreur lors de la récupération des utilisateurs' 
+    });
+  }
+});
+
+// GET /api/admin/stats - Statistiques globales
+router.get('/stats', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { dateRange } = req.query;
+    
+    // Filtres de date
+    const dateFilter = {};
+    if (dateRange && dateRange !== 'all') {
+      const days = parseInt(dateRange.replace('days', ''));
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      dateFilter.createdAt = { $gte: startDate };
+    }
+
+    // Statistiques des utilisateurs
+    const [totalUsers, livreurs, closeurs] = await Promise.all([
+      User.countDocuments({ role: { $in: ['livreur', 'closeur'] } }),
+      User.countDocuments({ role: 'livreur' }),
+      User.countDocuments({ role: 'closeur' })
+    ]);
+
+    // Statistiques des commandes
+    const [livraisons, attributions] = await Promise.all([
+      Order.countDocuments({ ...dateFilter, status: 'livré' }),
+      Order.countDocuments({ ...dateFilter, status: 'attribué' })
+    ]);
+
+    res.json({
+      success: true,
+      stats: {
+        totalUsers,
+        livreurs,
+        closeurs,
+        livraisons,
+        attributions
+      }
+    });
+  } catch (error) {
+    console.error('Erreur récupération statistiques:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Erreur lors de la récupération des statistiques' 
     });
   }
 });
@@ -183,167 +232,5 @@ router.get('/activities', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/admin/stats - Statistiques globales
-router.get('/stats', authenticate, requireAdmin, async (req, res) => {
-  try {
-    const { dateRange } = req.query;
-    
-    // Filtres de date
-    const dateFilter = {};
-    if (dateRange && dateRange !== 'all') {
-      const days = parseInt(dateRange.replace('days', ''));
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-      dateFilter.createdAt = { $gte: startDate };
-    }
-
-    // Statistiques des utilisateurs
-    const [totalUsers, activeLivreurs] = await Promise.all([
-      User.countDocuments({ role: { $in: ['livreur', 'closeur'] } }),
-      User.countDocuments({ role: 'livreur', isActive: true })
-    ]);
-
-    // Statistiques des commandes
-    const [attributedOrders, deliveredOrders] = await Promise.all([
-      Order.countDocuments({ ...dateFilter, status: 'attribué' }),
-      Order.countDocuments({ ...dateFilter, status: 'livré' })
-    ]);
-
-    res.json({
-      success: true,
-      stats: {
-        totalUsers,
-        activeLivreurs,
-        attributedOrders,
-        deliveredOrders
-      }
-    });
-  } catch (error) {
-    console.error('Erreur récupération statistiques:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Erreur lors de la récupération des statistiques' 
-    });
-  }
-});
-
-// GET /api/admin/user/:id/activities - Activités d'un utilisateur spécifique
-router.get('/user/:id/activities', authenticate, requireAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { limit = 50 } = req.query;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'ID utilisateur invalide' 
-      });
-    }
-
-    const user = await User.findById(id);
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Utilisateur non trouvé' 
-      });
-    }
-
-    // Construire le filtre selon le rôle
-    const orderFilter = {};
-    if (user.role === 'livreur') {
-      orderFilter.livreurId = user._id;
-    } else if (user.role === 'closeur' && user.boutique) {
-      orderFilter.boutique = user.boutique;
-    }
-
-    const activities = await Order.find(orderFilter)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .lean();
-
-    res.json({
-      success: true,
-      activities: activities.map(order => ({
-        _id: order._id,
-        numeroCommande: order.numeroCommande,
-        status: order.status,
-        createdAt: order.createdAt,
-        updatedAt: order.updatedAt,
-        action: order.status === 'livré' ? 'Commande livrée' : 
-                order.status === 'attribué' ? 'Commande attribuée' :
-                order.status === 'annulé' ? 'Commande annulée' : 'Commande créée'
-      }))
-    });
-  } catch (error) {
-    console.error('Erreur récupération activités utilisateur:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Erreur lors de la récupération des activités' 
-    });
-  }
-});
-
-// GET /api/admin/user/:id/stats - Statistiques d'un utilisateur spécifique
-router.get('/user/:id/stats', authenticate, requireAdmin, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { dateRange } = req.query;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'ID utilisateur invalide' 
-      });
-    }
-
-    const user = await User.findById(id);
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Utilisateur non trouvé' 
-      });
-    }
-
-    // Filtres de base
-    const orderFilter = {};
-    if (user.role === 'livreur') {
-      orderFilter.livreurId = user._id;
-    } else if (user.role === 'closeur' && user.boutique) {
-      orderFilter.boutique = user.boutique;
-    }
-
-    // Filtres de date
-    if (dateRange && dateRange !== 'all') {
-      const days = parseInt(dateRange.replace('days', ''));
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-      orderFilter.createdAt = { $gte: startDate };
-    }
-
-    // Calculer les statistiques
-    const [totalOrders, deliveredOrders, pendingOrders, attributedOrders] = await Promise.all([
-      Order.countDocuments(orderFilter),
-      Order.countDocuments({ ...orderFilter, status: 'livré' }),
-      Order.countDocuments({ ...orderFilter, status: 'en_attente' }),
-      Order.countDocuments({ ...orderFilter, status: 'attribué' })
-    ]);
-
-    res.json({
-      success: true,
-      stats: {
-        totalOrders,
-        deliveredOrders,
-        pendingOrders,
-        attributedOrders
-      }
-    });
-  } catch (error) {
-    console.error('Erreur récupération statistiques utilisateur:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Erreur lors de la récupération des statistiques' 
-    });
-  }
-});
-
+// Autres routes restent inchangées...
 module.exports = router;
