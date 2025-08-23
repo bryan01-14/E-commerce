@@ -28,7 +28,7 @@ import { fr } from 'date-fns/locale';
 import api from '../api/axios';
 
 const AdminActivity = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser } = useAuth(); // Renommer pour éviter la confusion
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState([]);
   const [users, setUsers] = useState([]);
@@ -50,8 +50,8 @@ const AdminActivity = () => {
       setLoading(true);
       const [activitiesRes, usersRes, statsRes] = await Promise.all([
         api.get('/admin/activities', { params: filters }),
-        api.get('/admin/users', { params: { userType: filters.userType, dateRange: filters.dateRange } }),
-        api.get('/admin/stats', { params: { dateRange: filters.dateRange } })
+        api.get('/admin/users'),
+        api.get('/admin/stats')
       ]);
 
       setActivities(activitiesRes.data.activities || []);
@@ -117,6 +117,7 @@ const AdminActivity = () => {
     }
   };
 
+  // Vérifier si currentUser est défini avant d'accéder à ses propriétés
   if (!currentUser || currentUser.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -212,7 +213,7 @@ const AdminActivity = () => {
         </div>
 
         {/* Statistiques globales */}
-        <div className="grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        <div className="grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-col-4 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -231,8 +232,8 @@ const AdminActivity = () => {
                 <Truck className="h-8 w-8 text-green-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Livreurs</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.livreurs || 0}</p>
+                <p className="text-sm font-medium text-gray-500">Livreurs actifs</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.activeLivreurs || 0}</p>
               </div>
             </div>
           </div>
@@ -243,8 +244,8 @@ const AdminActivity = () => {
                 <Package className="h-8 w-8 text-purple-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Closeurs</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.closeurs || 0}</p>
+                <p className="text-sm font-medium text-gray-500">Commandes attribuées</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.attributedOrders || 0}</p>
               </div>
             </div>
           </div>
@@ -252,13 +253,11 @@ const AdminActivity = () => {
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <TrendingUp className="h-8 w-8 text-orange-600" />
+                <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Livraisons/Attributions</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.livraisons || 0} / {stats.attributions || 0}
-                </p>
+                <p className="text-sm font-medium text-gray-500">Commandes livrées</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.deliveredOrders || 0}</p>
               </div>
             </div>
           </div>
@@ -354,12 +353,22 @@ const AdminActivity = () => {
 
                       {/* Statistiques de l'utilisateur */}
                       {user.stats && (
-                        <div className="mt-4">
-                          <div className="text-center p-3 bg-blue-50 rounded-lg max-w-xs">
-                            <p className="text-2xl font-bold text-blue-600">{user.stats.count || 0}</p>
-                            <p className="text-xs text-gray-500">
-                              {user.stats.type === 'livraisons' ? 'Colis livrés' : 'Colis attribués'}
-                            </p>
+                        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                          <div className="text-center">
+                            <p className="text-2xl font-bold text-blue-600">{user.stats.totalOrders || 0}</p>
+                            <p className="text-xs text-gray-500">Commandes totales</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-2xl font-bold text-green-600">{user.stats.deliveredOrders || 0}</p>
+                            <p className="text-xs text-gray-500">Livrées</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-2xl font-bold text-yellow-600">{user.stats.pendingOrders || 0}</p>
+                            <p className="text-xs text-gray-500">En attente</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-2xl font-bold text-purple-600">{user.stats.attributedOrders || 0}</p>
+                            <p className="text-xs text-gray-500">Attribuées</p>
                           </div>
                         </div>
                       )}
@@ -508,11 +517,23 @@ const AdminActivity = () => {
                   {selectedUser.stats && (
                     <div>
                       <h4 className="text-md font-medium text-gray-900 mb-3">Statistiques</h4>
-                      <div className="text-center p-4 bg-blue-50 rounded-lg">
-                        <p className="text-3xl font-bold text-blue-600">{selectedUser.stats.count || 0}</p>
-                        <p className="text-sm text-gray-500">
-                          {selectedUser.stats.type === 'livraisons' ? 'Colis livrés' : 'Colis attribués'}
-                        </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="text-center p-3 bg-blue-50 rounded-lg">
+                          <p className="text-2xl font-bold text-blue-600">{selectedUser.stats.totalOrders || 0}</p>
+                          <p className="text-xs text-gray-500">Total</p>
+                        </div>
+                        <div className="text-center p-3 bg-green-50 rounded-lg">
+                          <p className="text-2xl font-bold text-green-600">{selectedUser.stats.deliveredOrders || 0}</p>
+                          <p className="text-xs text-gray-500">Livrées</p>
+                        </div>
+                        <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                          <p className="text-2xl font-bold text-yellow-600">{selectedUser.stats.pendingOrders || 0}</p>
+                          <p className="text-xs text-gray-500">En attente</p>
+                        </div>
+                        <div className="text-center p-3 bg-purple-50 rounded-lg">
+                          <p className="text-2xl font-bold text-purple-600">{selectedUser.stats.attributedOrders || 0}</p>
+                          <p className="text-xs text-gray-500">Attribuées</p>
+                        </div>
                       </div>
                     </div>
                   )}
