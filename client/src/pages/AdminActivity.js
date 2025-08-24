@@ -381,7 +381,7 @@ const AdminActivity = () => {
           )}
         </div>
 
-        {/* Activités récentes */}
+        {/* Activités récentes
         <div className="bg-white rounded-lg shadow mt-6">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-medium text-gray-900">
@@ -464,7 +464,7 @@ const AdminActivity = () => {
               </table>
             </div>
           )}
-        </div>
+        </div> */}
 
         {/* Modal détails utilisateur */}
         {showUserDetails && selectedUser && (
