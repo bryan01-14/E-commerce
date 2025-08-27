@@ -35,7 +35,7 @@ const AdminActivity = () => {
   const [stats, setStats] = useState({});
   const [filters, setFilters] = useState({
     userType: 'all',
-    dateRange: '7days',
+    dateRange: 'today',
     status: 'all'
   });
   const [selectedUser, setSelectedUser] = useState(null);
@@ -186,6 +186,7 @@ const AdminActivity = () => {
                 onChange={(e) => handleFilterChange('dateRange', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
+                <option value="today">Aujourd'hui</option>
                 <option value="7days">7 derniers jours</option>
                 <option value="30days">30 derniers jours</option>
                 <option value="90days">90 derniers jours</option>
@@ -381,8 +382,8 @@ const AdminActivity = () => {
           )}
         </div>
 
-        {/* Activités récentes
-        <div className="bg-white rounded-lg shadow mt-6">
+        {/* Activités récentes */}
+        {/* <div className="bg-white rounded-lg shadow mt-6">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-medium text-gray-900">
               Activités récentes ({activities.length})

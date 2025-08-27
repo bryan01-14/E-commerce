@@ -25,9 +25,17 @@ router.get('/users', authenticate, requireAdmin, async (req, res) => {
         // Filtrer par date si spécifié
         const dateFilter = {};
         if (dateRange && dateRange !== 'all') {
-          const days = parseInt(dateRange.replace('days', ''));
-          const startDate = new Date();
-          startDate.setDate(startDate.getDate() - days);
+          let startDate = new Date();
+          
+          if (dateRange === 'today') {
+            // Aujourd'hui seulement
+            startDate.setHours(0, 0, 0, 0);
+          } else {
+            // Pour les autres périodes
+            const days = parseInt(dateRange.replace('days', ''));
+            startDate.setDate(startDate.getDate() - days);
+          }
+          
           dateFilter.createdAt = { $gte: startDate };
         }
 
@@ -83,9 +91,17 @@ router.get('/stats', authenticate, requireAdmin, async (req, res) => {
     // Filtres de date
     const dateFilter = {};
     if (dateRange && dateRange !== 'all') {
-      const days = parseInt(dateRange.replace('days', ''));
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      let startDate = new Date();
+      
+      if (dateRange === 'today') {
+        // Aujourd'hui seulement
+        startDate.setHours(0, 0, 0, 0);
+      } else {
+        // Pour les autres périodes
+        const days = parseInt(dateRange.replace('days', ''));
+        startDate.setDate(startDate.getDate() - days);
+      }
+      
       dateFilter.createdAt = { $gte: startDate };
     }
 
@@ -201,9 +217,17 @@ router.get('/activities', authenticate, requireAdmin, async (req, res) => {
     }
 
     if (dateRange && dateRange !== 'all') {
-      const days = parseInt(dateRange.replace('days', ''));
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      let startDate = new Date();
+      
+      if (dateRange === 'today') {
+        // Aujourd'hui seulement
+        startDate.setHours(0, 0, 0, 0);
+      } else {
+        // Pour les autres périodes
+        const days = parseInt(dateRange.replace('days', ''));
+        startDate.setDate(startDate.getDate() - days);
+      }
+      
       matchStage.createdAt = { $gte: startDate };
     }
 
@@ -232,5 +256,4 @@ router.get('/activities', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// Autres routes restent inchangées...
 module.exports = router;
