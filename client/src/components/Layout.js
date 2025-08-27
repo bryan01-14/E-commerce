@@ -32,8 +32,8 @@ const Layout = () => {
   // Vérifier si user est défini avant d'accéder à ses propriétés
   const navigation = user ? [
     { name: 'Tableau de bord', href: '/dashboard', icon: Home },
-    ...(user.role === 'livreur' ? [{ name: 'commande', href: '/orderlivreur', icon: Users }] : []),
-    ...(user.role === 'admin' || user.role === 'closeur' ? [{ name: 'Attribuer Commandes', href: '/orders', icon: Package }] : []),
+    ...(user.role === 'livreur' ? [{ name: 'Mes Commandes', href: '/orderlivreur', icon: Package }] : []),
+    ...((user.role === 'admin' || user.role === 'closeur') ? [{ name: 'Attribuer Commandes', href: '/orders', icon: Package }] : []),
     ...(user.role === 'admin' ? [{ name: 'Utilisateurs', href: '/users', icon: Users }] : []),
     ...(user.role === 'admin' ? [{ name: 'Surveillance Activités', href: '/admin-activity', icon: Activity }] : []),
     ...(user.role === 'admin' ? [{ name: 'Total des commandes', href: '/google-sheets', icon: Database }] : []),
@@ -138,12 +138,12 @@ const Layout = () => {
               {/* Connection status */}
               <div className="flex items-center gap-x-2">
                 {connected ? (
-                  <WifiOff className="h-4 w-4 text-danger-500" />
+                  <Wifi className="h-4 w-4 text-success-500" />
                 ) : (
-                  <Wifi className="h-4 w-4  text-success-500" />
+                  <WifiOff className="h-4 w-4 text-danger-500" />
                 )}
                 <span className="text-xs text-gray-500">
-                  {connected ? ' Déconnecté' : 'Connecté'}
+                  {connected ? 'Connecté' : 'Déconnecté'}
                 </span>
               </div>
 

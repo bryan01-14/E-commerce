@@ -24,18 +24,34 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [stats, orders] = await Promise.all([
-          api.get('/orders/stats/overview'),
+        setLoading(true);
+        
+        // Préparer les paramètres en fonction du rôle
+        const params = {};
+        
+        // Si l'utilisateur est un closeur, filtrer par sa boutique
+        if (user?.role === 'closeur' && user?.boutique) {
+          params.boutique = user.boutique;
+        }
+        
+        const [statsResponse, ordersResponse] = await Promise.all([
+          api.get('/orders/stats/overview', { params }),
           api.get('/orders', {
-            params: { limit: 5, sortBy: 'dateCommande', sortOrder: 'desc' }
+            params: { 
+              ...params,
+              limit: 5, 
+              sortBy: 'dateCommande', 
+              sortOrder: 'desc' 
+            }
           })
         ]);
-        setStats(stats.data);
-        setRecentOrders(orders.data.orders || []);
+        
+        setStats(statsResponse.data);
+        setRecentOrders(ordersResponse.data.orders || []);
         
         // Récupérer les informations de la configuration active
-        if (stats.data.activeSheetConfig) {
-          setActiveSheetConfig(stats.data.activeSheetConfig);
+        if (statsResponse.data.activeSheetConfig) {
+          setActiveSheetConfig(statsResponse.data.activeSheetConfig);
         }
       } catch (err) {
         console.error('Dashboard error:', err);
@@ -44,41 +60,43 @@ const Dashboard = () => {
       }
     };
   
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
   const getStatusIcon = (status) => {
     switch (status) {
       case 'Livré':
-        return <CheckCircle className="h-5 w-5 text-success-500" />;
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
       case 'Non Livré':
-        return <XCircle className="h-5 w-5 text-danger-500" />;
+        return <XCircle className="h-5 w-5 text-red-500" />;
       case 'Attribué':
-        return <Truck className="h-5 w-5 text-primary-500" />;
+        return <Truck className="h-5 w-5 text-blue-500" />;
       default:
-        return <Clock className="h-5 w-5 text-warning-500" />;
+        return <Clock className="h-5 w-5 text-yellow-500" />;
     }
   };
 
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Livré':
-        return 'badge-success';
+        return 'bg-green-100 text-green-800';
       case 'Non Livré':
-        return 'badge-danger';
+        return 'bg-red-100 text-red-800';
       case 'Attribué':
-        return 'badge-info';
+        return 'bg-blue-100 text-blue-800';
       case 'Reprogrammé':
-        return 'badge-warning';
+        return 'bg-yellow-100 text-yellow-800';
       default:
-        return 'badge-info';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -93,6 +111,7 @@ const Dashboard = () => {
         {user ? (
           <p className="mt-1 text-sm text-gray-500">
             Bienvenue, {user.prenom} {user.nom}
+            {user.role === 'closeur' && user.boutique && ` - Boutique: ${user.boutique}`}
           </p>
         ) : (
           <p className="mt-1 text-sm text-gray-500">
@@ -139,98 +158,90 @@ const Dashboard = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="card">
-          <div className="card-body">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Package className="h-8 w-8 text-primary-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Commandes
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {stats?.total || 0}
-                  </dd>
-                </dl>
-              </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Package className="h-8 w-8 text-blue-600" />
+            </div>
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="text-sm font-medium text-gray-500 truncate">
+                  Total Commandes
+                </dt>
+                <dd className="text-lg font-medium text-gray-900">
+                  {stats?.total || 0}
+                </dd>
+              </dl>
             </div>
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-body">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CheckCircle className="h-8 w-8 text-success-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Livrées
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {stats?.statsByStatus?.find(s => s._id === 'Livré')?.count || 0}
-                  </dd>
-                </dl>
-              </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="text-sm font-medium text-gray-500 truncate">
+                  Livrées
+                </dt>
+                <dd className="text-lg font-medium text-gray-900">
+                  {stats?.statsByStatus?.find(s => s._id === 'Livré')?.count || 0}
+                </dd>
+              </dl>
             </div>
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-body">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Clock className="h-8 w-8 text-warning-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    En attente
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {stats?.statsByStatus?.find(s => s._id === 'En attente')?.count || 0}
-                  </dd>
-                </dl>
-              </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Clock className="h-8 w-8 text-yellow-600" />
+            </div>
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="text-sm font-medium text-gray-500 truncate">
+                  En attente
+                </dt>
+                <dd className="text-lg font-medium text-gray-900">
+                  {stats?.statsByStatus?.find(s => s._id === 'En attente')?.count || 0}
+                </dd>
+              </dl>
             </div>
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-body">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <SwissFranc className="h-8 w-8 text-success-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Chiffre d'affaires
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {stats?.totalValue?.toLocaleString('fr-FR', {
-                      style: 'currency',
-                      currency: 'XOF'
-                    }) || '0 FCFA'}
-                  </dd>
-                </dl>
-              </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <SwissFranc className="h-8 w-8 text-green-600" />
+            </div>
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="text-sm font-medium text-gray-500 truncate">
+                  Chiffre d'affaires
+                </dt>
+                <dd className="text-lg font-medium text-gray-900">
+                  {stats?.totalValue?.toLocaleString('fr-FR', {
+                    style: 'currency',
+                    currency: 'XOF'
+                  }) || '0 FCFA'}
+                </dd>
+              </dl>
             </div>
           </div>
         </div>
       </div>
 
       {/* Recent Orders */}
-      <div className="card">
-        <div className="card-header">
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-4 py-4 border-b border-gray-200">
           <h3 className="text-lg leading-6 font-medium text-gray-900">
             Commandes récentes
           </h3>
         </div>
-        <div className="card-body">
+        <div className="p-4">
           {recentOrders.length === 0 ? (
             <p className="text-gray-500 text-center py-8">
               Aucune commande récente
@@ -281,7 +292,7 @@ const Dashboard = () => {
                       <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           {getStatusIcon(order.statut)}
-                          <span className={`ml-2 text-xs ${getStatusBadge(order.statut)}`}>
+                          <span className={`ml-2 text-xs px-2 py-1 rounded-full ${getStatusBadge(order.statut)}`}>
                             {order.statut}
                           </span>
                         </div>
@@ -306,70 +317,73 @@ const Dashboard = () => {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="card">
-          <div className="card-body">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Actions rapides
-            </h3>
-            <div className="space-y-3">
-              <button className="w-full btn-primary" onClick={() => navigate('/orders')}>
-                Voir toutes les commandes
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Actions rapides
+          </h3>
+          <div className="space-y-3">
+            <button 
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              onClick={() => navigate('/orders')}
+            >
+              Voir toutes les commandes
+            </button>
+            {user?.role === 'admin' && (
+              <button 
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                onClick={() => navigate('/users')}
+              >
+                Gérer les utilisateurs
               </button>
-              {user?.role === 'admin' && (
-                <button className="w-full btn-secondary" onClick={() => navigate('/users')}>
-                  Gérer les utilisateurs
-                </button>
-              )}
-              <button className="w-full btn-secondary" onClick={() => navigate('/settings')}>
-                Paramètres
-              </button>
-            </div>
+            )}
+            <button 
+              className="w-full px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+              onClick={() => navigate('/settings')}
+            >
+              Paramètres
+            </button>
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-body">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Statistiques par statut
-            </h3>
-            <div className="space-y-3">
-              {stats?.statsByStatus?.map((stat) => (
-                <div key={stat._id} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{stat._id}</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {stat.count} ({((stat.count / stats.total) * 100).toFixed(1)}%)
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-body">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Informations système
-            </h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Rôle:</span>
-                <span className="font-medium">{user?.role || 'N/A'}</span>
-              </div>
-              {user?.boutique && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Boutique:</span>
-                  <span className="font-medium">{user.boutique}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-gray-600">Dernière connexion:</span>
-                <span className="font-medium">
-                  {user?.derniereConnexion ? 
-                    format(new Date(user.derniereConnexion), 'dd/MM/yyyy HH:mm', { locale: fr }) :
-                    'N/A'
-                  }
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Statistiques par statut
+          </h3>
+          <div className="space-y-3">
+            {stats?.statsByStatus?.map((stat) => (
+              <div key={stat._id} className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">{stat._id}</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {stat.count} ({((stat.count / stats.total) * 100).toFixed(1)}%)
                 </span>
               </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Informations système
+          </h3>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Rôle:</span>
+              <span className="font-medium">{user?.role || 'N/A'}</span>
+            </div>
+            {user?.boutique && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">Boutique:</span>
+                <span className="font-medium">{user.boutique}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-gray-600">Dernière connexion:</span>
+              <span className="font-medium">
+                {user?.derniereConnexion ? 
+                  format(new Date(user.derniereConnexion), 'dd/MM/yyyy HH:mm', { locale: fr }) :
+                  'N/A'
+                }
+              </span>
             </div>
           </div>
         </div>
