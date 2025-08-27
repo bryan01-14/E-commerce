@@ -32,9 +32,8 @@ const Layout = () => {
   // Vérifier si user est défini avant d'accéder à ses propriétés
   const navigation = user ? [
     { name: 'Tableau de bord', href: '/dashboard', icon: Home },
-    ...(user.role === 'livreur' ? [{ name: 'commande', href: '/orderlivreur', icon: Users }] : []),
-    ...(user.role === 'admin' ? [{ name: 'Attribuer Commandes', href: '/orders', icon: Package }] : []),
-    ...(user.role === 'closeur' ? [{ name: 'Attribuer Commandes', href: '/orders', icon: Package }] : []),
+    ...(user.role === 'livreur' ? [{ name: 'Mes Commandes', href: '/orderlivreur', icon: Package }] : []),
+    ...((user.role === 'admin' || user.role === 'closeur') ? [{ name: 'Attribuer Commandes', href: '/orders', icon: Package }] : []),
     ...(user.role === 'admin' ? [{ name: 'Utilisateurs', href: '/users', icon: Users }] : []),
     ...(user.role === 'admin' ? [{ name: 'Surveillance Activités', href: '/admin-activity', icon: Activity }] : []),
     ...(user.role === 'admin' ? [{ name: 'Total des commandes', href: '/google-sheets', icon: Database }] : []),
@@ -79,7 +78,7 @@ const Layout = () => {
                 className={({ isActive }) =>
                   `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
                     isActive
-                      ? 'bg-primary-100 text-primary-900'
+                      ? 'bg-blue-100 text-blue-900'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`
                 }
@@ -106,7 +105,7 @@ const Layout = () => {
                 className={({ isActive }) =>
                   `group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
                     isActive
-                      ? 'bg-primary-100 text-primary-900'
+                      ? 'bg-blue-100 text-blue-900'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`
                 }
@@ -139,12 +138,12 @@ const Layout = () => {
               {/* Connection status */}
               <div className="flex items-center gap-x-2">
                 {connected ? (
-                  <WifiOff className="h-4 w-4 text-danger-500" />
+                  <Wifi className="h-4 w-4 text-green-500" />
                 ) : (
-                  <Wifi className="h-4 w-4  text-success-500" />
+                  <WifiOff className="h-4 w-4 text-red-500" />
                 )}
                 <span className="text-xs text-gray-500">
-                  {connected ? ' Déconnecté' : 'Connecté'}
+                  {connected ? 'Connecté' : 'Déconnecté'}
                 </span>
               </div>
 
@@ -168,7 +167,7 @@ const Layout = () => {
                           {user.boutique && ` - ${user.boutique}`}
                         </p>
                       </div>
-                      <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center">
+                      <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center">
                         <User className="h-4 w-4 text-white" />
                       </div>
                     </>

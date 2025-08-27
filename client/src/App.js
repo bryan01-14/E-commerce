@@ -17,7 +17,7 @@ import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
 
 // Composant pour protéger les routes
-const ProtectedRoute = ({ children, requiredRole }) => {
+const ProtectedRoute = ({ children, requiredRoles = [] }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -28,7 +28,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && user.role !== requiredRole) {
+  if (requiredRoles.length > 0 && !requiredRoles.includes(user.role)) {
     // Rediriger vers le dashboard approprié selon le rôle
     if (user.role === 'livreur') {
       return <Navigate to="/livreur-dashboard" replace />;
@@ -70,7 +70,7 @@ const AppContent = () => {
         <Route 
           path="dashboard" 
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRoles={['admin', 'closeur']}>
               <Dashboard />
             </ProtectedRoute>
           } 
@@ -78,7 +78,7 @@ const AppContent = () => {
         <Route 
           path="livreur-dashboard" 
           element={
-            <ProtectedRoute requiredRole="livreur">
+            <ProtectedRoute requiredRoles={['livreur']}>
               <LivreurDashboard />
             </ProtectedRoute>
           } 
@@ -86,7 +86,7 @@ const AppContent = () => {
         <Route 
           path="orders" 
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRoles={['admin', 'closeur']}>
               <Orders />
             </ProtectedRoute>
           } 
@@ -94,7 +94,7 @@ const AppContent = () => {
         <Route 
           path="orderlivreur" 
           element={
-            <ProtectedRoute requiredRole="livreur">
+            <ProtectedRoute requiredRoles={['livreur']}>
               <Orderlivreur />
             </ProtectedRoute>
           } 
@@ -102,7 +102,7 @@ const AppContent = () => {
         <Route 
           path="users" 
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRoles={['admin']}>
               <Users />
             </ProtectedRoute>
           } 
@@ -110,7 +110,7 @@ const AppContent = () => {
         <Route 
           path="settings" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={['admin', 'closeur', 'livreur']}>
               <Settings />
             </ProtectedRoute>
           } 
@@ -118,7 +118,7 @@ const AppContent = () => {
         <Route 
           path="google-sheets" 
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRoles={['admin']}>
               <GoogleSheetsTest />
             </ProtectedRoute>
           } 
@@ -126,7 +126,7 @@ const AppContent = () => {
         <Route 
           path="google-sheets-config" 
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRoles={['admin']}>
               <GoogleSheetsConfig />
             </ProtectedRoute>
           } 
@@ -134,7 +134,7 @@ const AppContent = () => {
         <Route 
           path="admin-activity" 
           element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRoles={['admin']}>
               <AdminActivity />
             </ProtectedRoute>
           } 
